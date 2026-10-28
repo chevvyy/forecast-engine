@@ -1,0 +1,22 @@
+scheme: expanding_walk_forward
+initial_train: 2016-01-04/2019-12-31
+val_block: 3M
+step: 3M
+purge: by_label_interval
+embargo_min: 450           # >= max horizon (60) + longest feature lookback crossing the boundary; be generous
+final_holdout: 6M          # most recent; touch once per phase
+
+metrics:
+  returns: [mae_rel_rw, pinball, crps, coverage_80, rank_ic, hit_rate]
+  volatility: [qlike, mse_log_rv, coverage_80]
+  significance: diebold_mariano_hac
+baselines: [zero_return, random_walk, rolling_mean_390, har_rv]
+
+backtest:
+  signal_at: bar_close
+  fill_at: next_bar_open
+  cost_bps_per_side: 2.0
+  rebalance: 30Min
+  strategy: long_short_top_k
+  top_k: 5
+  report: [net_return, vol, sharpe, max_drawdown, turnover, deflated_sharpe]

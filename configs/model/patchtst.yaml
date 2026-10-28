@@ -1,0 +1,30 @@
+name: patchtst
+family: deep
+input:
+  lookback_min: 512
+  channels: [log_return, realized_vol_15, volume_z_30, vwap_distance, spy_return]
+  channel_independent: true
+architecture:
+  patch_len: 16
+  stride: 8
+  d_model: 128
+  n_heads: 8
+  n_layers: 3
+  ff_mult: 2
+  dropout: 0.2
+  revin: true
+heads:
+  targets: [log_return, realized_vol]
+  horizons_min: [5, 15, 30, 60]
+  quantiles: [0.1, 0.25, 0.5, 0.75, 0.9]
+  monotonic_quantiles: true
+global_model:
+  security_embedding_dim: 16
+  sector_embedding_dim: 8
+vram_estimate_gb: 4
+search_space:
+  lookback_min: {type: categorical, choices: [256, 512, 1024, 2048]}
+  patch_len: {type: categorical, choices: [8, 16, 32]}
+  d_model: {type: categorical, choices: [64, 128, 256]}
+  n_layers: {type: int, low: 2, high: 6}
+  dropout: {type: float, low: 0.05, high: 0.4}

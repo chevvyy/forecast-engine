@@ -1,0 +1,40 @@
+# Initial universe. Keep small and liquid until Phase 3 passes.
+name: liquid_v1
+session: regular          # regular | extended
+timezone_store: UTC
+timezone_exchange: America/New_York
+calendar: XNYS
+start: 2016-01-04
+end: null                 # null = today
+timeframes: [1Min, 1Day]
+feed: sip
+adjustment: all           # stored raw; this is the derived view used for features
+
+benchmarks: [SPY, QQQ, IWM, DIA]
+sectors: [XLK, XLF, XLE, XLV, XLY, XLP, XLI, XLU, XLB, XLRE, XLC]
+singles:
+  - AAPL
+  - MSFT
+  - NVDA
+  - AMZN
+  - GOOGL
+  - META
+  - TSLA
+  - JPM
+  - V
+  - UNH
+  - XOM
+  - JNJ
+  - PG
+  - HD
+  - COST
+  - AVGO
+  - LLY
+  - MA
+  - WMT
+  - BAC
+  # extend to ~40-80 once the pipeline is stable
+
+survivorship_note: >
+  Universe chosen from current constituents. Return results carry survivorship bias
+  until a point-in-time universe is implemented.

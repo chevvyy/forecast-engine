@@ -1,0 +1,41 @@
+# Feature set v1. Every group declares its max lookback (minutes) for embargo sizing.
+name: v1
+bar: 1Min
+
+labels:
+  horizons_min: [5, 15, 30, 60]
+  targets:
+    - log_return
+    - realized_vol        # sqrt(sum of squared 1-min log returns over horizon)
+  quantiles: [0.1, 0.25, 0.5, 0.75, 0.9]
+
+groups:
+  returns:
+    lags_min: [1, 5, 15, 30, 60, 390]
+    lookback_min: 390
+  realized_vol:
+    windows_min: [15, 30, 60, 390]
+    lookback_min: 390
+  range_vol:              # Parkinson, Garman-Klass
+    windows_min: [30, 390]
+    lookback_min: 390
+  volume:
+    zscore_windows_min: [30, 390]
+    lookback_min: 7800    # 20 sessions for volume baseline
+  vwap_distance:
+    lookback_min: 390
+  calendar:               # time-of-day, day-of-week, minutes-to-close (no lookback)
+    lookback_min: 0
+  market_context:         # SPY/QQQ returns and vol, sector ETF return of the stock's sector
+    lookback_min: 390
+  cross_sectional:        # per-timestamp ranks across the universe
+    lookback_min: 60
+
+normalization:
+  method: train_fold_stats   # never full-sample
+  clip_sigma: 8
+
+missing:
+  forward_fill_price: true
+  emit_is_filled_flag: true
+  fill_volume: zero

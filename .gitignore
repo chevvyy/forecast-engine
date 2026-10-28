@@ -1,0 +1,30 @@
+# secrets
+.env
+
+# data and artifacts (real store lives on the NAS)
+data/*
+!data/README.md
+mlruns/
+mlartifacts/
+checkpoints/
+*.parquet
+*.ckpt
+*.pt
+*.safetensors
+*.lgb
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.uv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# os / editors
+.DS_Store
+.vscode/
+.idea/

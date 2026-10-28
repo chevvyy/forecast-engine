@@ -1,0 +1,25 @@
+# Worker profiles. A worker only accepts trials whose vram_estimate_gb <= usable_vram_gb.
+profiles:
+  rtx5070ti:
+    arch: sm_120
+    vram_gb: 16
+    usable_vram_gb: 14      # headroom for desktop/display
+    precision: bf16
+    compile: true
+    num_workers: 8
+    preferred_families: [deep, foundation]
+  rtx3060:
+    arch: sm_86
+    vram_gb: 12
+    usable_vram_gb: 11
+    precision: bf16
+    compile: true
+    num_workers: 6
+    preferred_families: [gbdt, deep]
+
+scheduler:
+  backend: optuna
+  storage_env: OPTUNA_STORAGE
+  pruner: median           # or hyperband
+  trial_timeout_min: 240
+  heartbeat_sec: 60        # Optuna marks stale trials failed so others can continue

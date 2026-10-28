@@ -1,0 +1,23 @@
+name: moderntcn
+family: deep
+input:
+  lookback_min: 512
+  channels: [log_return, realized_vol_15, volume_z_30, vwap_distance, spy_return]
+architecture:
+  patch_len: 8
+  stride: 4
+  d_model: 64
+  kernel_size: 51          # large-kernel depthwise conv is the core idea
+  n_blocks: 3
+  ffn_ratio: 2
+  dropout: 0.2
+  revin: true
+heads:
+  targets: [log_return, realized_vol]
+  horizons_min: [5, 15, 30, 60]
+  quantiles: [0.1, 0.25, 0.5, 0.75, 0.9]
+vram_estimate_gb: 4
+search_space:
+  kernel_size: {type: categorical, choices: [31, 51, 71]}
+  d_model: {type: categorical, choices: [32, 64, 128]}
+  n_blocks: {type: int, low: 1, high: 4}

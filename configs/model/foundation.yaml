@@ -1,0 +1,18 @@
+# Phase 4 challengers. Each runs in three modes on identical folds.
+models:
+  tirex:
+    source: NX-AI TiRex (xLSTM, ~35M params)
+    modes: [zero_shot, frozen_embeddings, fine_tune]
+    vram_estimate_gb: {zero_shot: 2, fine_tune: 8}
+    notes: Univariate in v1; TiRex-2 adds multivariate + streaming. Good fit for live minute inference.
+  kronos:
+    source: https://github.com/shiyu-coder/Kronos (MIT)
+    sizes: [mini, small, base, large]
+    input: OHLCV (+amount) jointly tokenized
+    modes: [zero_shot, frozen_embeddings, fine_tune]
+    vram_estimate_gb: {small_fine_tune: 6, base_fine_tune: 12}
+    notes: Finance-specific. Published zero-shot vol results on A-shares were poor; test, don't assume.
+  chronos2:
+    source: amazon-science/chronos-forecasting
+    modes: [zero_shot]
+    notes: Reference generic TSFM. Expected to lose to LightGBM on returns.

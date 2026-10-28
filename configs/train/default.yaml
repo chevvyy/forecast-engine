@@ -1,0 +1,21 @@
+seed: 1337
+max_epochs: 50
+batch_size: 256
+optimizer: adamw
+lr: 3.0e-4
+weight_decay: 1.0e-4
+scheduler: cosine
+warmup_steps: 500
+grad_clip: 1.0
+loss: pinball
+early_stopping:
+  monitor: val_crps
+  patience: 5
+checkpoint:
+  every_n_steps: 2000
+  dir_env: DATA_ROOT
+logging:
+  tracker: mlflow
+  log_max_vram: true
+  log_data_hash: true
+  log_config_hash: true

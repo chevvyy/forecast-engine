@@ -1,0 +1,33 @@
+# Run config consumed by every fe-* command. Copy and edit (e.g. configs/run/pc.yaml) per machine.
+data:
+  source: store              # store | synthetic
+  layer: adjusted
+  timeframe: 1Min
+  universe: configs/data/universe.yaml
+  features: configs/features/v1.yaml
+  subsample_every: 5         # keep every 5th decision minute (memory + less label overlap)
+  synthetic:                 # used when source=synthetic
+    n_symbols: 12
+    start: 2024-01-02
+    end: 2024-07-01
+    signal: 0.0
+    seed: 0
+
+eval:
+  first_val_start: 2020-01-01   # walk_forward.yaml: initial train 2016-01-04/2019-12-31
+  val_block: 3M
+  step: 3M
+  embargo_min: 450
+  final_holdout: 6M
+  min_train_rows: 1000
+
+tune:
+  tasks: [rv_30, ret_30]        # any of {ret,rv}_{5,15,30,60}
+  trials_per_round: 25
+  rounds: 0                     # 0 = run until stopped
+  max_folds: 6                  # most recent N walk-forward folds used while tuning (speed)
+  device: gpu                   # LightGBM device_type: gpu (OpenCL) | cuda | cpu; falls back to cpu
+  promote_alpha: 0.01           # DM p-value required to replace the champion
+  min_rel_improvement: 0.002    # and at least 0.2% lower loss
+  report_alpha: 0.05            # "beats baseline" threshold for result cards
+  n_jobs: -1

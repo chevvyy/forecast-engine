@@ -4,8 +4,31 @@ A from-scratch forecasting engine for US equities: ingest minute bars, build lea
 models on whichever GPU is free (RTX 5070 Ti 16 GB or RTX 3060 12 GB), and serve predictions to the
 forecast-chat demo.
 
-> Status: **scaffold only.** No implementation code yet. Every module folder contains a `README.md`
-> describing what goes there, its inputs/outputs, and the tests that must exist before it counts as done.
+> Status: **Phase 1–3 (GBDT) implemented.** Data ingest, session alignment, leak-free features and labels,
+> purged walk-forward, baselines (incl. HAR-RV), LightGBM quantile models, a self-improving
+> champion/challenger tuning loop, a one-shot holdout, batch scoring and the API for forecast-chat.
+> Deep models (PatchTST/ModernTCN) and foundation models are next.
+
+## Quick start (Windows GPU box)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\windows\setup.ps1   # uv, deps, .env with Alpaca keys, tests
+powershell -ExecutionPolicy Bypass -File scripts\windows\run.ps1     # ingest -> DQ -> baselines -> autotune (runs until Ctrl+C)
+```
+Other machines: `uv sync --extra dev`, then `uv run fe-<command> --config configs/run/<file>.yaml`.
+
+| Command | Does |
+|---|---|
+| `fe-ingest` | Resumable Alpaca pull (raw + adjusted), manifest in `DATA_ROOT/manifests` |
+| `fe-dq` | Data-quality report (OHLC sanity, gaps, extreme moves, corporate-action days) |
+| `fe-baselines` | Rung-0 baselines on every task + reference cards |
+| `fe-autotune` | Self-improving loop: Optuna trials → challenger vs champion (DM test) → promote, card, LOG |
+| `fe-worker` | Extra GPU worker on the same Optuna study (set `OPTUNA_STORAGE` to the shared Postgres) |
+| `fe-holdout --task rv_30` | Touch the final holdout **once** for a champion (locked; `--force REASON` is recorded) |
+| `fe-score` / `fe-serve` | Score the latest bar per symbol / serve `GET /forecast/{symbol}` for forecast-chat |
+
+Offline smoke run without market data: `--config configs/run/synthetic.yaml` (synthetic bars with a
+planted signal). See `docs/AUTOTUNE.md` for how the improvement loop decides and what stops it overfitting.
 
 ---
 

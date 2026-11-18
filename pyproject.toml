@@ -29,8 +29,27 @@ dependencies = [
   "python-dotenv>=1.0",
   # --- serving ---
   "fastapi>=0.115",
+  "scipy>=1.13",               # binomial / t tests in evaluation
+  "pyyaml>=6",                 # configs (hydra-core pulls it too; explicit because we import it)
   "uvicorn>=0.30",
 ]
+
+[project.scripts]
+fe-ingest = "forecast.cli:fe_ingest"
+fe-dq = "forecast.cli:fe_dq"
+fe-baselines = "forecast.cli:fe_baselines"
+fe-autotune = "forecast.cli:fe_autotune"
+fe-worker = "forecast.cli:fe_worker"
+fe-holdout = "forecast.cli:fe_holdout"
+fe-score = "forecast.cli:fe_score"
+fe-serve = "forecast.cli:fe_serve"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/forecast"]
 
 [project.optional-dependencies]
 reference-models = [
@@ -61,11 +80,13 @@ explicit = true
 torch = { index = "pytorch-cu128" }
 
 [tool.ruff]
-line-length = 100
+line-length = 110
 target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "N", "SIM", "DTZ"]   # DTZ: forbid naive datetimes
+# ML conventions: X / y / M (metrics) / E (experiment) / G (groups) are fine as names
+ignore = ["N803", "N806", "N812", "N802"]
 
 [tool.mypy]
 strict = true
@@ -77,4 +98,6 @@ markers = [
   "leakage: tests that guard against look-ahead (must never be skipped)",
   "gpu: requires a CUDA device",
   "network: hits an external API",
+  "slow: end-to-end training checks (~1-3 min)",
 ]
+filterwarnings = ["ignore::UserWarning"]

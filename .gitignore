@@ -28,3 +28,10 @@ __pycache__/
 .DS_Store
 .vscode/
 .idea/
+
+# engine outputs (cards, champions/*.json and LOG.md stay tracked)
+experiments/optuna.db
+experiments/autotune/
+experiments/champions/*.pkl
+experiments/champions/*.npz
+experiments/run-*.log

@@ -14,8 +14,8 @@ groups:
     lags_min: [1, 5, 15, 30, 60, 390]
     lookback_min: 390
   realized_vol:
-    windows_min: [15, 30, 60, 390]
-    lookback_min: 390
+    windows_min: [15, 30, 60, 390, 1950]   # 1950 = 5 sessions (HAR weekly component)
+    lookback_min: 1950
   range_vol:              # Parkinson, Garman-Klass
     windows_min: [30, 390]
     lookback_min: 390

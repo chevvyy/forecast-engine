@@ -1,0 +1,27 @@
+# Dev's desktop (RTX 5070 Ti, Windows). Memory-safer window: 2019+ minute bars.
+# Widen data.start to 2016-01-04 (and first_val_start to 2020-01-01) once RAM use is known.
+data:
+  source: store
+  layer: adjusted
+  timeframe: 1Min
+  start: 2019-01-02
+  universe: configs/data/universe.yaml
+  features: configs/features/v1.yaml
+  subsample_every: 5
+eval:
+  first_val_start: 2021-01-01
+  val_block: 3M
+  step: 3M
+  embargo_min: 450
+  final_holdout: 6M
+  min_train_rows: 1000
+tune:
+  tasks: [rv_30, ret_30, rv_5, ret_5, rv_60, ret_60]
+  trials_per_round: 25
+  rounds: 0
+  max_folds: 6
+  device: gpu
+  promote_alpha: 0.01
+  min_rel_improvement: 0.002
+  report_alpha: 0.05
+  n_jobs: -1

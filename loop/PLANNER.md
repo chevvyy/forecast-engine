@@ -74,13 +74,25 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
       `loop/workers/<name>.json` must be given one small ingest job before anything depends on it.
       Known gaps, written in the module docstring: no exchange calendar (half-day afternoons keep a few
       after-hours bars), missing minutes are not filled, `load` holds everything in memory.
-      (b) [ ] `configs/loop_minute.yaml` (horizons 5/15/30/60 bars) with its own leaderboard, and the
-      feature/label path for intraday bars: a bar's `t` is its START, so it is known only at `t` + 1
-      minute (add a leakage test for that), windows and labels must not cross the overnight gap, and
-      intraday evaluation must also report results net of a per-trade cost assumption
-      (docs/EVALUATION.md). Start with a short symbol list; hundreds of symbols times years of minutes
-      needs an out-of-core window path first. Can be built and tested on Yahoo `1h`/`5m` (keyless stopgaps:
-      ~730 and ~60 days; 1-minute history there is only about 30 days, too short to validate anything).
+      (b) feature/label path, then config and scoring:
+      (b1) [x] intraday feature/label path (done 2026-11-25: `features.build.build(..., bar_seconds=)`,
+      chosen by `data.interval` in the job runner; `tests/test_intraday.py`, 4 leakage tests). A bar's
+      `t` is its START, so a row is usable only from `Dataset.known` = `t` + one bar. A row exists only
+      if its window bars and label bars sit on one unbroken bar grid, so nothing crosses the overnight
+      gap, a weekend or a missing bar; at a session open the return is open-to-close and the gap channel
+      is 0. Trailing statistics (rv20 scale, volume z-score, HAR regressors) still run across sessions on
+      intraday returns. Costs of the rule: no forecast in the first `max_lookback` - 1 bars of a session
+      or its last `max(horizons)` bars, and a symbol with scattered missing minutes loses many rows.
+      Only ever run on synthetic sessions; no real intraday bars have gone through it yet.
+      (b2) [ ] `configs/loop_minute.yaml` (horizons 5/15/30/60 bars at 1 minute; `max_lookback` plus the
+      longest horizon must fit well inside a 390-bar session) selected per job or per worker, with its
+      own leaderboard so minute and daily scores never compete, and intraday evaluation that also reports
+      results net of a per-trade cost assumption (docs/EVALUATION.md). The DM lag and `embargo_bars`
+      need re-deriving for minute bars. Start with a short symbol list; hundreds of symbols times years
+      of minutes needs an out-of-core window path first. Can be tried on Yahoo `1h`/`5m` (keyless
+      stopgaps: ~730 and ~60 days; note Yahoo `5m` needs `range=60d`, the fetcher asks for 730d; at `1h`
+      a session is 7 bars, so only lookback + horizon <= 7 fits). A time-of-day input belongs with the
+      "richer causal features" item.
       (c) [ ] switch workers that have keys onto minute jobs. Needs Dev: create Alpaca paper keys and put
       `ALPACA_API_KEY` and `ALPACA_SECRET_KEY` in that worker's `.env` (log under "Needs Dev" until a
       heartbeat shows `alpaca_keys: true`).

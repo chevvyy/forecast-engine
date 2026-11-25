@@ -3,8 +3,8 @@
 
 - ``synthetic``: seeded GARCH-like bars for tests and smoke jobs. Never used for reportable results.
 - ``yahoo``: keyless split/dividend-adjusted bars (daily back decades, 1h back ~730 days).
-  Good enough to start the loop without accounts. Minute history needs Alpaca (see docs/DATA_SOURCES.md);
-  that ingestor is on the loop backlog and switches on when ALPACA_API_KEY is present.
+  Good enough to start the loop without accounts.
+- ``alpaca``: minute bars (``forecast.data.alpaca``); needs ALPACA_API_KEY / ALPACA_SECRET_KEY in ``.env``.
 """
 from __future__ import annotations
 
@@ -195,4 +195,10 @@ def load_bars(cfg: dict) -> pl.DataFrame:
         if cfg.get("start"):
             df = df.filter(pl.col("t") >= datetime.fromisoformat(str(cfg["start"])).replace(tzinfo=UTC))
         return df
+    if src == "alpaca":
+        from forecast.data import alpaca
+
+        if not cfg.get("start"):
+            raise ValueError("data.start is required for the alpaca source (minute history is large)")
+        return alpaca.load(symbols, datetime.fromisoformat(str(cfg["start"])).replace(tzinfo=UTC))
     raise ValueError(f"unknown data source {src!r}")

@@ -19,6 +19,7 @@ from pathlib import Path
 
 import yaml
 
+from forecast.data import alpaca
 from forecast.loop.leaderboard import champions, load_results
 from forecast.loop.run_job import artifact_dir, load_cfg, run_job
 from forecast.utils.common import REPO, device_info, write_json
@@ -175,8 +176,10 @@ def step(name: str, tiers: list[str], git: Git, rng: random.Random, repo: Path =
 
 
 def heartbeat(name: str, info: dict, repo: Path, last: str = "") -> None:
+    # alpaca_keys is a yes/no only: it tells the planner minute bars can be switched on for this machine.
     write_json(repo / "loop" / "workers" / f"{name}.json",
-               {"worker": name, "seen": datetime.now(UTC).isoformat(timespec="seconds"), "last": last, **info})
+               {"worker": name, "seen": datetime.now(UTC).isoformat(timespec="seconds"), "last": last,
+                "alpaca_keys": alpaca.available(), **info})
 
 
 def recover(name: str, git: Git, repo: Path) -> None:

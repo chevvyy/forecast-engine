@@ -2,6 +2,10 @@
 
 Build this first. Nothing downstream is trustworthy until these tests pass.
 
+## What exists
+`sources.py` (synthetic, keyless Yahoo, symbol lists) and `alpaca.py` (minute-bar ingestor: raw
+per-symbol-month parquet, resumable, adjusted on load). The table below is the fuller plan.
+
 ## Files to create
 | File | Responsibility |
 |---|---|

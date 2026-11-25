@@ -50,9 +50,9 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
       broke (paths on Windows, VRAM accounting, data gaps). Until `results/` shows `ok` runs from a real
       GPU, this outranks everything else.
 - [ ] **Wide universe (Dev asked for as many tickers as possible, 2026-11-25).** Two parts, in order:
-      (a) lazy window loading: keep per-symbol channel arrays and index windows at batch time instead of
-      materialising `X[n, C, L]`, which at 500+ symbols and lookback 256 needs ~15 GB of RAM; identical
-      outputs to the current builder must be asserted in a test. (b) a committed symbol list
+      (a) [x] lazy window loading (done 2026-11-25: `features.build.Windows`; `tests/test_windows.py`
+      asserts equality with the old eager builder; 520 synthetic symbols x 5400 bars at lookback 256 build
+      in ~0.5 GB instead of 15 GB). (b) [ ] a committed symbol list
       `configs/data/universe_wide.txt` (S&P 500 + Nasdaq-100 + the ETFs already used; verify the list
       against a current source, do not write it from memory), downloaded politely (Yahoo starts returning
       429 after several hundred rapid requests: keep the per-symbol pause, back off on 429, reuse the

@@ -1,0 +1,6 @@
+id: 20261125-p2-nano-preset-s12
+tier: nano
+kind: train
+seed: 12
+origin: planner
+note: 'tier preset, fixed seed: first real-data check and seed-noise estimate'

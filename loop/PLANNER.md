@@ -49,14 +49,27 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
 - [ ] First real-data triage: confirm jobs succeed on the real workers with Yahoo data; fix whatever
       broke (paths on Windows, VRAM accounting, data gaps). Until `results/` shows `ok` runs from a real
       GPU, this outranks everything else.
+- [ ] **Wide universe (Dev asked for as many tickers as possible, 2026-11-25).** Two parts, in order:
+      (a) lazy window loading: keep per-symbol channel arrays and index windows at batch time instead of
+      materialising `X[n, C, L]`, which at 500+ symbols and lookback 256 needs ~15 GB of RAM; identical
+      outputs to the current builder must be asserted in a test. (b) a committed symbol list
+      `configs/data/universe_wide.txt` (S&P 500 + Nasdaq-100 + the ETFs already used; verify the list
+      against a current source, do not write it from memory), downloaded politely (Yahoo starts returning
+      429 after several hundred rapid requests: keep the per-symbol pause, back off on 429, reuse the
+      parquet cache). Record in results that current-constituent lists carry survivorship bias. A new
+      universe changes the folds' contents: bump `eval.version`.
+- [ ] **Minute bars (Dev asked, for short-horizon forecasts).** Alpaca ingestor per docs/DATA_SOURCES.md:
+      resumable, per-symbol-month parquet, `feed=sip`, end time at least 15 minutes old (free plan),
+      under 200 requests/min, regular session only, switched on when `ALPACA_API_KEY` exists in a
+      worker's `.env` (Dev has to create the keys; log under "Needs Dev" until a worker reports them).
+      Separate config (`configs/loop_minute.yaml`: horizons 5/15/30/60 bars) and separate leaderboard.
+      Until keys exist, the keyless stopgaps are Yahoo `1h` (~730 days) and `5m` (~60 days); 1-minute
+      history there is only about the last 30 days, too short to validate anything.
+      Intraday evaluation must also report results net of a per-trade cost assumption (docs/EVALUATION.md).
 - [ ] Seed-noise estimate per tier; promotion must beat the champion by more than that noise.
 - [ ] LightGBM quantile baseline on tabular features (the scaffold's "first real model"); deep models
       must be compared against it in every result. Bumps `eval.version`.
 - [ ] Richer causal features: sector-ETF context per stock, cross-sectional ranks, calendar encodings.
-- [ ] Hourly bars (Yahoo `1h`, ~730 days) as a second dataset with its own leaderboard.
-- [ ] Alpaca minute-bar ingestor per docs/DATA_SOURCES.md, switched on when `ALPACA_API_KEY` exists in
-      a worker's `.env`; lazy window loading so minute data fits in RAM. This is what makes the mid and
-      large tiers worth their size.
 - [ ] Serving: a small read-only FastAPI app in `src/forecast/serving/` that loads a tier champion from
       `models/` and returns quantiles + its validation metrics; then, on a `loop` branch of
       forecast-chat, a provider that calls it. Code only; deployment is Dev's or his cluster agent's.

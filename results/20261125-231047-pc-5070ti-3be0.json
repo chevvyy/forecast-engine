@@ -1,0 +1,28 @@
+{
+  "device": "cuda",
+  "error": "ZoneInfoNotFoundError: 'No time zone found with key UTC'",
+  "eval_version": 1,
+  "finished": "2026-11-25T23:10:49+00:00",
+  "git": "6b1614d",
+  "gpu": "NVIDIA GeForce RTX 5070 Ti",
+  "id": "20261125-231047-pc-5070ti-3be0",
+  "job": {
+    "attempts": 1,
+    "id": "20261125-231047-pc-5070ti-3be0",
+    "kind": "train",
+    "note": "tier preset (first run)",
+    "origin": "worker",
+    "tier": "large",
+    "worker": "pc-5070ti"
+  },
+  "kind": "train",
+  "minutes": 0.0,
+  "status": "error",
+  "tier": "large",
+  "traceback": "3.12-windows-x86_64-none\\Lib\\importlib\\resources\\_common.py\", line 82, in _\n    return importlib.import_module(cand)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\howde\\AppData\\Roaming\\uv\\python\\cpython-3.12-windows-x86_64-none\\Lib\\importlib\\__init__.py\", line 90, in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<frozen importlib._bootstrap>\", line 1387, in _gcd_import\n  File \"<frozen importlib._bootstrap>\", line 1360, in _find_and_load\n  File \"<frozen importlib._bootstrap>\", line 1310, in _find_and_load_unlocked\n  File \"<frozen importlib._bootstrap>\", line 488, in _call_with_frames_removed\n  File \"<frozen importlib._bootstrap>\", line 1387, in _gcd_import\n  File \"<frozen importlib._bootstrap>\", line 1360, in _find_and_load\n  File \"<frozen importlib._bootstrap>\", line 1324, in _find_and_load_unlocked\nModuleNotFoundError: No module named 'tzdata'\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"C:\\Users\\howde\\forecast-worker\\forecast-engine\\src\\forecast\\loop\\run_job.py\", line 116, in run_job\n    ds, folds, dhash = prepare(cfg, lookback)\n                       ^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\howde\\forecast-worker\\forecast-engine\\src\\forecast\\loop\\run_job.py\", line 72, in prepare\n    dhash = hashlib.sha256(f\"{bars.height}|{bars['t'].max()}|{closes.sum():.6f}\".encode()).hexdigest()[:12]\n                                            ^^^^^^^^^^^^^^^\n  File \"C:\\Users\\howde\\forecast-worker\\forecast-engine\\.venv\\Lib\\site-packages\\polars\\series\\series.py\", line 2309, in max\n    return self._s.max()\n           ^^^^^^^^^^^^^\n  File \"C:\\Users\\howde\\AppData\\Roaming\\uv\\python\\cpython-3.12-windows-x86_64-none\\Lib\\zoneinfo\\_common.py\", line 24, in load_tzdata\n    raise ZoneInfoNotFoundError(f\"No time zone found with key {key}\")\nzoneinfo._common.ZoneInfoNotFoundError: 'No time zone found with key UTC'\n",
+  "universe": {
+    "note": "current index members and megacaps: survivorship bias, return skill is optimistic",
+    "requested": 35
+  },
+  "worker": "pc-5070ti"
+}

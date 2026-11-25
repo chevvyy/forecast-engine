@@ -1,0 +1,7 @@
+tier: large
+kind: train
+note: tier preset (first run)
+id: 20261125-234912-pc-5070ti-bff6
+origin: worker
+worker: pc-5070ti
+attempts: 1

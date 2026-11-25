@@ -56,7 +56,7 @@ def save_model(model: PatchNet, path: Path) -> None:
 
 
 def _slice(ds: Dataset, idx: np.ndarray) -> dict:
-    return {"X": ds.X[idx], "tab": ds.tab[idx], "y": ds.y[idx]}
+    return {"X": ds.X.subset(idx), "tab": ds.tab[idx], "y": ds.y[idx]}
 
 
 def prepare(cfg: dict, lookback: int) -> tuple[Dataset, list, str]:
@@ -112,7 +112,7 @@ def run_job(job: dict, cfg: dict | None = None, repo: Path = REPO, device: str |
         model = None
         for k, f in enumerate(folds):
             tr, es, va = _slice(ds, f.train), _slice(ds, f.es), _slice(ds, f.val)
-            fit_all = {key: np.concatenate([tr[key], es[key]]) for key in tr}
+            fit_all = {key: np.concatenate([tr[key], es[key]]) for key in ("tab", "y")}  # baselines ignore X
             unc, har = Unconditional(Q), HarRV(Q)
             unc.fit(fit_all)
             har.fit(fit_all)

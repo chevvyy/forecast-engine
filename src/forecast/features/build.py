@@ -21,9 +21,58 @@ WARMUP = 60
 EPS = 1e-8
 
 
+class Windows:
+    """Lazy ``[n, C, L]`` float32 channel windows.
+
+    Holds every symbol's per-bar channels once (``ch`` [N, C], symbols stacked end to end) plus, per
+    row, the position in ``ch`` of the window's last bar (``end``). Row ``k`` is
+    ``ch[end[k]-L+1 : end[k]+1].T``: bars up to and including bar i, never later ones. Indexing gives
+    exactly the array an eager builder would have produced, but only for the rows asked for, so a
+    500-symbol universe costs tens of MB instead of ~15 GB. A window never crosses into another symbol
+    because every row has at least ``L-1`` bars of its own symbol before it (``build`` guarantees it).
+    """
+
+    dtype = np.dtype(np.float32)
+
+    def __init__(self, ch: np.ndarray, end: np.ndarray, lookback: int):
+        self.ch, self.end, self.L = ch, end, int(lookback)
+        self._off = np.arange(-self.L + 1, 1)
+
+    def __len__(self) -> int:
+        return len(self.end)
+
+    @property
+    def shape(self) -> tuple[int, int, int]:
+        return (len(self.end), self.ch.shape[1], self.L)
+
+    @property
+    def nbytes(self) -> int:
+        """Size if fully materialised (what callers budget memory against)."""
+        return int(np.prod(self.shape)) * 4
+
+    def subset(self, idx: np.ndarray) -> Windows:
+        """Rows ``idx`` as another lazy view (no window is copied)."""
+        return Windows(self.ch, self.end[idx], self.L)
+
+    def take(self, rows: np.ndarray) -> np.ndarray:
+        e = np.atleast_1d(self.end[rows])
+        return np.ascontiguousarray(self.ch[e[:, None] + self._off].transpose(0, 2, 1))
+
+    def __getitem__(self, key):
+        if isinstance(key, tuple):          # e.g. X[..., -32:]: materialise, then plain numpy rules
+            return np.asarray(self)[key]
+        if isinstance(key, (int, np.integer)):
+            return self.take(np.array([key]))[0]
+        return self.take(key)
+
+    def __array__(self, dtype=None, copy=None):
+        a = self.take(slice(None))
+        return a if dtype is None else a.astype(dtype, copy=False)
+
+
 @dataclass
 class Dataset:
-    X: np.ndarray        # [n, C, L] float32 channel windows ending at bar i
+    X: Windows           # [n, C, L] float32 channel windows ending at bar i, built on demand
     tab: np.ndarray      # [n, len(TAB)] float32
     y: np.ndarray        # [n, H, 2] float32
     t: np.ndarray        # [n] int64 epoch seconds of bar i
@@ -73,7 +122,8 @@ def build(bars: pl.DataFrame, horizons: list[int], lookback: int, benchmark: str
         br = np.zeros(len(bc))
         br[1:] = np.log(bc[1:] / bc[:-1])
         bench = pl.DataFrame({"t": bench["t"], "mkt_ret": br})
-    Xs, tabs, ys, ts, tes, syms, scs = [], [], [], [], [], [], []
+    chs, ends, tabs, ys, ts, tes, syms, scs = [], [], [], [], [], [], [], []
+    base = 0  # rows of ``ch`` already taken by earlier symbols
     for si, s in enumerate(symbols):
         d = bars.filter(pl.col("symbol") == s).sort("t")
         if bench.height:
@@ -100,15 +150,17 @@ def build(bars: pl.DataFrame, horizons: list[int], lookback: int, benchmark: str
             sc = rv20[idx] * np.sqrt(hz)
             y[:, hi, 0] = (cs[idx + hz] - cs[idx]) / sc
             y[:, hi, 1] = np.log((np.sqrt(cs2[idx + hz] - cs2[idx]) + EPS) / sc)
-        win = np.lib.stride_tricks.sliding_window_view(ch, lookback, axis=0)  # [n-L+1, C, L]
-        Xs.append(win[idx - lookback + 1].astype(np.float32))
+        chs.append(ch.astype(np.float32))
+        ends.append(base + idx)
+        base += n
         tabs.append(tab[idx].astype(np.float32))
         ys.append(np.clip(y, -8, 8))
         ts.append(tsec[idx])
         tes.append(tsec[idx + hmax])
         syms.append(np.full(len(idx), si, dtype=np.int32))
         scs.append(rv20[idx].astype(np.float32))
-    if not Xs:
+    if not chs:
         raise ValueError("no usable rows: not enough history for the lookback/horizons requested")
-    return Dataset(np.concatenate(Xs), np.concatenate(tabs), np.concatenate(ys), np.concatenate(ts),
+    X = Windows(np.concatenate(chs), np.concatenate(ends).astype(np.int64), lookback)
+    return Dataset(X, np.concatenate(tabs), np.concatenate(ys), np.concatenate(ts),
                    np.concatenate(tes), np.concatenate(syms), np.concatenate(scs), symbols, list(horizons))

@@ -12,6 +12,7 @@ import time
 import numpy as np
 import torch
 
+from forecast.features.build import Windows
 from forecast.models.patchnet import PatchNet
 
 
@@ -43,7 +44,7 @@ def apply_masks(model: torch.nn.Module, masks: dict[str, torch.Tensor] | None) -
 def fit(model: PatchNet, train: dict, es: dict, cfg: dict, quantiles: list[float], device: str,
         teacher_pred: np.ndarray | None = None, masks: dict[str, torch.Tensor] | None = None,
         deadline: float | None = None) -> dict:
-    """train/es: dicts with X, tab, y numpy arrays. ``teacher_pred`` [n_train, H, 2, Q] turns this into
+    """train/es: dicts with X (array or lazy ``Windows``), tab, y. ``teacher_pred`` [n_train, H, 2, Q] turns this into
     distillation. ``masks`` keeps pruned weights at zero. Returns training stats; best weights are loaded
     back into ``model``."""
     model.to(device)
@@ -59,11 +60,22 @@ def fit(model: PatchNet, train: dict, es: dict, cfg: dict, quantiles: list[float
     sched = torch.optim.lr_scheduler.LambdaLR(opt, lr_at)
     alpha = float(cfg.get("distill_alpha", 0.5))
     on_gpu = device == "cuda"
-    # Keep tensors on the device when they fit comfortably; otherwise stream batches from host RAM.
-    keep = on_gpu and train["X"].nbytes < 0.35 * torch.cuda.mem_get_info(0)[0]
+    lazy = isinstance(train["X"], Windows)
+    # Lazy windows: only the per-bar channels live on the device and each batch is gathered there.
+    # Eager arrays: keep them on the device when they fit comfortably, else stream from host RAM.
+    keep = on_gpu and (lazy or train["X"].nbytes < 0.35 * torch.cuda.mem_get_info(0)[0])
     def to(a):
         return torch.from_numpy(a).to(device) if keep or not on_gpu else torch.from_numpy(a)
-    Xt, Tt, Yt = to(train["X"]), to(train["tab"]), to(train["y"])
+    Tt, Yt = to(train["tab"]), to(train["y"])
+    if lazy:
+        ch, end = to(train["X"].ch), to(train["X"].end)
+        off = torch.arange(-train["X"].L + 1, 1, device=ch.device)
+        def x_at(idx: torch.Tensor) -> torch.Tensor:
+            return ch[end[idx][:, None] + off].permute(0, 2, 1).contiguous()
+    else:
+        Xt = to(train["X"])
+        def x_at(idx: torch.Tensor) -> torch.Tensor:
+            return Xt[idx]
     Pt = to(teacher_pred) if teacher_pred is not None else None
     apply_masks(model, masks)
     best, best_state, bad, step, ep_done = float("inf"), None, 0, 0, 0
@@ -72,10 +84,10 @@ def fit(model: PatchNet, train: dict, es: dict, cfg: dict, quantiles: list[float
         torch.cuda.reset_peak_memory_stats()
     for _ep in range(epochs):
         model.train()
-        perm = torch.randperm(n, device=Xt.device)
+        perm = torch.randperm(n, device=Tt.device)
         for i in range(0, n, bs):
             idx = perm[i:i + bs]
-            xb, tb, yb = Xt[idx].to(device), Tt[idx].to(device), Yt[idx].to(device)
+            xb, tb, yb = x_at(idx).to(device), Tt[idx].to(device), Yt[idx].to(device)
             with torch.autocast("cuda", dtype=torch.bfloat16, enabled=on_gpu):
                 pred = model(xb, tb)
             pred = pred.float()

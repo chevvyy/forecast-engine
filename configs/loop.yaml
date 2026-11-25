@@ -2,9 +2,9 @@
 branch: loop
 
 data:
-  source: yahoo            # keyless adjusted bars. Switch to alpaca minute bars once keys exist (backlog).
+  source: auto             # daily bars: Alpaca if the worker has keys in .env, else keyless Yahoo
   interval: 1d
-  start: "2005-01-01"
+  start: "2016-01-04"      # Alpaca's first day; the same start for both sources keeps folds aligned
   benchmark: SPY
   symbols: [SPY, QQQ, IWM, DIA, XLK, XLF, XLE, XLV, XLY, XLP, XLI, XLU, XLB, XLRE, XLC,
             AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA, JPM, V, UNH, XOM, JNJ, PG, HD, COST,

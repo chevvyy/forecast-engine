@@ -45,6 +45,14 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
 8. **Tell Dev only when it matters:** a worker down > 6 h, the loop blocked on something only he can
    do, or a tier's champion beating the baseline for the first time (or by a new clear margin).
 
+## Data source note (2026-11-25)
+Yahoo answered HTTP 429 to the first request from pc-5070ti: it refuses scripted clients. Do not add
+browser impersonation, spoofed TLS fingerprints, proxies or any other way around that refusal. Daily
+bars now come from Alpaca when the worker has keys (`data.source: auto`), from 2016-01-04. Results from a
+worker without keys (Yahoo) and one with keys (Alpaca) differ slightly in data; if both kinds ever
+report, record the source in results and keep them on separate leaderboards. The wide-universe list
+still applies; with Alpaca, 539 symbols is about 4 minutes of requests at the free plan's rate.
+
 ## Backlog (ordered; tick items off here as they land)
 - [ ] First real-data triage: confirm jobs succeed on the real workers with Yahoo data; fix whatever
       broke (paths on Windows, VRAM accounting, data gaps). Until `results/` shows `ok` runs from a real

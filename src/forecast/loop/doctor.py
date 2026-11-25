@@ -25,12 +25,24 @@ def main() -> int:
             print(f"[FAIL] CUDA present but unusable: {e}")
     cfg = load_cfg()
     try:
-        from forecast.data.sources import _yahoo_fetch, parse_yahoo_chart
-        n = parse_yahoo_chart("SPY", _yahoo_fetch("SPY", cfg["data"]["interval"])).height
-        print(f"[ok] market data reachable ({n} SPY bars)")
+        from forecast.data import alpaca, sources
+
+        if alpaca.available():
+            from datetime import UTC, datetime, timedelta
+            now = datetime.now(UTC)
+            n = alpaca.fetch_bars("SPY", now - timedelta(days=30), now - alpaca.DELAY, alpaca.credentials(),
+                                  timeframe="1Day", adjustment="all").height
+            if n == 0:
+                raise RuntimeError("Alpaca answered but returned no SPY bars")
+            print(f"[ok] market data reachable (Alpaca, {n} recent SPY daily bars)")
+        else:
+            n = sources.parse_yahoo_chart("SPY", sources._yahoo_fetch("SPY", cfg["data"]["interval"])).height
+            print(f"[ok] market data reachable (Yahoo, {n} SPY bars). No Alpaca keys in .env")
     except Exception as e:
         ok = False
         print(f"[FAIL] market data: {e}")
+        print("       If this is Yahoo answering 429, it is refusing scripted clients. Put Alpaca paper keys")
+        print("       (ALPACA_API_KEY, ALPACA_SECRET_KEY) in a .env file in this folder and re-run.")
     r = subprocess.run(["git", "push", "--dry-run", "origin", f"HEAD:{cfg['branch']}"], cwd=REPO,
                        capture_output=True, text=True)
     if r.returncode == 0:

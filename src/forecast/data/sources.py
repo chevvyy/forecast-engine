@@ -4,6 +4,7 @@
 - ``synthetic``: seeded GARCH-like bars for tests and smoke jobs. Never used for reportable results.
 - ``yahoo``: keyless split/dividend-adjusted bars (daily back decades, 1h back ~730 days).
   Good enough to start the loop without accounts.
+- ``auto``: daily bars from Alpaca when this machine has keys, else from Yahoo.
 - ``alpaca``: minute bars (``forecast.data.alpaca``); needs ALPACA_API_KEY / ALPACA_SECRET_KEY in ``.env``.
 """
 from __future__ import annotations
@@ -216,6 +217,17 @@ def load_bars(cfg: dict) -> pl.DataFrame:
     if src == "synthetic":
         return synthetic(symbols, int(cfg.get("n_bars", 1500)), int(cfg.get("seed", 0)),
                          interval_seconds(cfg.get("interval", "1d")))
+    start = datetime.fromisoformat(str(cfg["start"])).replace(tzinfo=UTC) if cfg.get("start") else None
+    if src == "auto":
+        # Daily bars from whichever source this machine can use: Alpaca when keys are present (a keyed
+        # API meant for programs), otherwise keyless Yahoo, which may refuse scripted clients with 429.
+        from forecast.data import alpaca
+
+        if interval_seconds(str(cfg.get("interval", "1d"))) != 86400:
+            raise ValueError("data.source auto is for daily bars; use alpaca for minute bars")
+        if alpaca.available():
+            return alpaca.daily(symbols, start or alpaca.DAILY_FLOOR)
+        src = "yahoo"
     if src == "yahoo":
         df = yahoo(symbols, cfg.get("interval", "1d"))
         if cfg.get("start"):

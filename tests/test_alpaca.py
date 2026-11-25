@@ -197,3 +197,28 @@ def test_rate_limit_backs_off_and_bad_keys_fail_fast(api):
     with pytest.raises(RuntimeError, match="401") as e:
         alpaca.fetch_bars("SPY", datetime(2024, 3, 4, tzinfo=UTC), datetime(2024, 3, 5, tzinfo=UTC), CREDS)
     assert len(api.requests) == n and CREDS[1] not in str(e.value)
+
+
+def test_daily_bars_come_adjusted_cached_and_auto_prefers_alpaca(api, monkeypatch):
+    from forecast.data.sources import load_bars
+
+    monkeypatch.setenv("ALPACA_API_KEY", CREDS[0])
+    monkeypatch.setenv("ALPACA_SECRET_KEY", CREDS[1])
+    cfg = {"source": "auto", "interval": "1d", "symbols": ["AAA", "BBB"], "start": "2016-01-04"}
+    df = load_bars(cfg)
+    assert set(df["symbol"].unique()) == {"AAA", "BBB"} and df.height > 100
+    assert all(q["timeframe"] == "1Day" and q["adjustment"] == "all" for _, q in api.requests)
+    n = len(api.requests)
+    assert load_bars(cfg).equals(df) and len(api.requests) == n        # second call is served from cache
+    assert df["t"].min() >= datetime(2016, 1, 4, tzinfo=UTC)
+
+
+def test_auto_without_keys_uses_yahoo(monkeypatch, tmp_path):
+    from forecast.data import sources
+
+    for k in ("ALPACA_API_KEY", "ALPACA_SECRET_KEY"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setattr(alpaca, "REPO", tmp_path / "nowhere")
+    seen = []
+    monkeypatch.setattr(sources, "yahoo", lambda syms, interval: seen.append(interval) or sources.synthetic(syms, 80))
+    assert sources.load_bars({"source": "auto", "symbols": ["SPY", "AAA"]}).height == 160 and seen == ["1d"]

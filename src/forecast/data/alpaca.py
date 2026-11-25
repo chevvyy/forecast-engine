@@ -243,3 +243,35 @@ def load(symbols: list[str], start: datetime, now: datetime | None = None) -> pl
     if len(frames) < max(2, len(symbols) // 2):
         raise RuntimeError(f"too few symbols with alpaca minute bars ({len(frames)}/{len(symbols)})")
     return pl.concat(frames).select(COLS).sort(["symbol", "t"])
+
+
+DAILY_FLOOR = datetime(2016, 1, 4, tzinfo=UTC)   # Alpaca's history starts in 2016
+
+
+def daily(symbols: list[str], start: datetime, now: datetime | None = None, max_age_h: float = 20.0) -> pl.DataFrame:
+    """Split/dividend-adjusted daily bars, one parquet per symbol under ``<DATA_ROOT>/alpaca/1Day/``.
+
+    Unlike the minute store, a stale file is refetched whole with ``adjustment=all``: daily history is a
+    few thousand rows, and one fetch keeps the whole series adjusted as of the same moment."""
+    creds = credentials()
+    if creds is None:
+        raise MissingKeysError("no ALPACA_API_KEY / ALPACA_SECRET_KEY in the environment or .env")
+    now = now or datetime.now(UTC)
+    start = max(start, DAILY_FLOOR)
+    cache = data_root() / "alpaca" / "1Day"
+    cache.mkdir(parents=True, exist_ok=True)
+    frames, failed = [], []
+    for s in symbols:
+        p = cache / f"{s}.parquet"
+        if not (p.exists() and (time.time() - p.stat().st_mtime) < max_age_h * 3600):
+            try:
+                df = fetch_bars(s, DAILY_FLOOR, now - DELAY, creds, timeframe="1Day", adjustment="all")
+                if df.height:
+                    _write(df, p)
+            except Exception as e:  # keep going with the stale copy if there is one
+                failed.append(f"{s}: {e}")
+        if p.exists():
+            frames.append(pl.read_parquet(p))
+    if len(frames) < max(2, len(symbols) // 2):
+        raise RuntimeError(f"too few symbols loaded ({len(frames)}/{len(symbols)}); errors: {failed[:3]}")
+    return pl.concat(frames).select(COLS).filter(pl.col("t") >= start).sort(["symbol", "t"])

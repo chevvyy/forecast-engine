@@ -64,14 +64,26 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
       dataset. When switching, check the tier time budgets: the first download is roughly 539 requests
       (several minutes) and an epoch is about 15x longer, so `max_minutes` may need raising, and the
       list should be re-verified against a second full source (281 of the 503 S&P rows rest on one).
-- [ ] **Minute bars (Dev asked, for short-horizon forecasts).** Alpaca ingestor per docs/DATA_SOURCES.md:
-      resumable, per-symbol-month parquet, `feed=sip`, end time at least 15 minutes old (free plan),
-      under 200 requests/min, regular session only, switched on when `ALPACA_API_KEY` exists in a
-      worker's `.env` (Dev has to create the keys; log under "Needs Dev" until a worker reports them).
-      Separate config (`configs/loop_minute.yaml`: horizons 5/15/30/60 bars) and separate leaderboard.
-      Until keys exist, the keyless stopgaps are Yahoo `1h` (~730 days) and `5m` (~60 days); 1-minute
-      history there is only about the last 30 days, too short to validate anything.
-      Intraday evaluation must also report results net of a per-trade cost assumption (docs/EVALUATION.md).
+- [ ] **Minute bars (Dev asked, for short-horizon forecasts).** Three parts, in order:
+      (a) [x] Alpaca ingestor (done 2026-11-25: `forecast.data.alpaca`, `data.source: alpaca`;
+      resumable per-symbol-month parquet, `feed=sip`, nothing newer than 16 minutes, ~170 requests/min,
+      regular session only; `tests/test_alpaca.py` runs it against a fake server). It stores RAW bars and
+      adjusts on load from daily adjusted/raw closes instead of requesting `adjustment=all`, because a
+      cache of provider-adjusted months goes stale at the next split or dividend. It has never talked to
+      the real API (no keys yet): the first worker that reports `alpaca_keys: true` in
+      `loop/workers/<name>.json` must be given one small ingest job before anything depends on it.
+      Known gaps, written in the module docstring: no exchange calendar (half-day afternoons keep a few
+      after-hours bars), missing minutes are not filled, `load` holds everything in memory.
+      (b) [ ] `configs/loop_minute.yaml` (horizons 5/15/30/60 bars) with its own leaderboard, and the
+      feature/label path for intraday bars: a bar's `t` is its START, so it is known only at `t` + 1
+      minute (add a leakage test for that), windows and labels must not cross the overnight gap, and
+      intraday evaluation must also report results net of a per-trade cost assumption
+      (docs/EVALUATION.md). Start with a short symbol list; hundreds of symbols times years of minutes
+      needs an out-of-core window path first. Can be built and tested on Yahoo `1h`/`5m` (keyless stopgaps:
+      ~730 and ~60 days; 1-minute history there is only about 30 days, too short to validate anything).
+      (c) [ ] switch workers that have keys onto minute jobs. Needs Dev: create Alpaca paper keys and put
+      `ALPACA_API_KEY` and `ALPACA_SECRET_KEY` in that worker's `.env` (log under "Needs Dev" until a
+      heartbeat shows `alpaca_keys: true`).
 - [ ] Seed-noise estimate per tier; promotion must beat the champion by more than that noise.
 - [ ] LightGBM quantile baseline on tabular features (the scaffold's "first real model"); deep models
       must be compared against it in every result. Bumps `eval.version`.

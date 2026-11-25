@@ -49,15 +49,21 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
 - [ ] First real-data triage: confirm jobs succeed on the real workers with Yahoo data; fix whatever
       broke (paths on Windows, VRAM accounting, data gaps). Until `results/` shows `ok` runs from a real
       GPU, this outranks everything else.
-- [ ] **Wide universe (Dev asked for as many tickers as possible, 2026-11-25).** Two parts, in order:
+- [ ] **Wide universe (Dev asked for as many tickers as possible, 2026-11-25).** Three parts, in order:
       (a) [x] lazy window loading (done 2026-11-25: `features.build.Windows`; `tests/test_windows.py`
       asserts equality with the old eager builder; 520 synthetic symbols x 5400 bars at lookback 256 build
-      in ~0.5 GB instead of 15 GB). (b) [ ] a committed symbol list
-      `configs/data/universe_wide.txt` (S&P 500 + Nasdaq-100 + the ETFs already used; verify the list
-      against a current source, do not write it from memory), downloaded politely (Yahoo starts returning
-      429 after several hundred rapid requests: keep the per-symbol pause, back off on 429, reuse the
-      parquet cache). Record in results that current-constituent lists carry survivorship bias. A new
-      universe changes the folds' contents: bump `eval.version`.
+      in ~0.5 GB instead of 15 GB). (b) [x] committed symbol list and polite download (done
+      2026-11-25: `configs/data/universe_wide.txt`, 539 symbols = S&P 500 + Nasdaq-100 + the 15 ETFs,
+      sources and how far each was cross-checked are in the file header; `data.symbols_file` is read by
+      `sources.resolve_symbols`; Yahoo 404 skips the symbol at once, 429 backs off 15 s -> 120 s and
+      honours Retry-After, and after repeated 429s the rest of the call uses the parquet cache; every
+      result now carries `universe.requested` and the survivorship note; `tests/test_data_sources.py`).
+      (c) [ ] switch the loop to it: uncomment `data.symbols_file` in `configs/loop.yaml` and bump
+      `eval.version` in the same commit. Do this only after `results/` shows `ok` real-data runs on the
+      35-symbol universe (item 1), so the first triage is not confounded by a 15x larger download and
+      dataset. When switching, check the tier time budgets: the first download is roughly 539 requests
+      (several minutes) and an epoch is about 15x longer, so `max_minutes` may need raising, and the
+      list should be re-verified against a second full source (281 of the 503 S&P rows rest on one).
 - [ ] **Minute bars (Dev asked, for short-horizon forecasts).** Alpaca ingestor per docs/DATA_SOURCES.md:
       resumable, per-symbol-month parquet, `feed=sip`, end time at least 15 minutes old (free plan),
       under 200 requests/min, regular session only, switched on when `ALPACA_API_KEY` exists in a

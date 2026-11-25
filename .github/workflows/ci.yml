@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, loop]
   pull_request:
 
 jobs:
@@ -15,5 +15,5 @@ jobs:
         run: uv sync --extra dev
       - name: Lint
         run: uv run ruff check .
-      - name: Tests (exit code 5 = no tests collected yet; allowed during scaffold phase)
-        run: uv run pytest -m "not gpu and not network" || [ $? -eq 5 ]
+      - name: Tests
+        run: uv run pytest -m "not gpu and not network"

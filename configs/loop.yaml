@@ -1,0 +1,69 @@
+# The self-improvement loop reads everything from this file. Workers pick up edits on their next pull.
+branch: loop
+
+data:
+  source: yahoo            # keyless adjusted bars. Switch to alpaca minute bars once keys exist (backlog).
+  interval: 1d
+  start: "2005-01-01"
+  benchmark: SPY
+  symbols: [SPY, QQQ, IWM, DIA, XLK, XLF, XLE, XLV, XLY, XLP, XLI, XLU, XLB, XLRE, XLC,
+            AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA, JPM, V, UNH, XOM, JNJ, PG, HD, COST,
+            AVGO, LLY, MA, WMT, BAC]
+
+task:
+  horizons: [1, 5, 20]     # bars ahead
+  quantiles: [0.1, 0.25, 0.5, 0.75, 0.9]
+  max_lookback: 256        # fixes the first usable row so every job sees identical folds
+
+eval:
+  version: 1               # bump when folds, baselines or metrics change; old scores stop competing
+  holdout_frac: 0.08       # most recent slice; no loop job may ever build rows from it
+  n_folds: 3
+  val_frac: 0.08
+  embargo_bars: 5
+  es_frac: 0.1
+
+train:
+  batch_size: 512
+  max_epochs: 40
+  lr: 0.001
+  weight_decay: 0.0001
+  patience: 5
+  grad_clip: 1.0
+  distill_alpha: 0.5
+
+# A tier is a deployment budget, not a parameter target. A run only counts for a tier if it fits.
+tiers:
+  nano:      # any phone, CPU only
+    max_params: 200000
+    max_onnx_bytes: 1000000
+    max_cpu_ms: 20
+    min_vram_gb: 0
+    max_minutes: 10
+    model: {lookback: 64, patch: 4, stride: 2, d_model: 24, n_blocks: 2, kernel: 9, ffn: 2, dropout: 0.1}
+  mid:       # mid-tier PC, 8 GB VRAM
+    max_train_vram_gb: 7
+    min_vram_gb: 2
+    max_minutes: 25
+    model: {lookback: 128, patch: 4, stride: 2, d_model: 128, n_blocks: 4, kernel: 25, ffn: 2, dropout: 0.15}
+  large:     # RTX 5070 Ti, 16 GB VRAM
+    max_train_vram_gb: 14
+    min_vram_gb: 6
+    max_minutes: 45
+    model: {lookback: 256, patch: 8, stride: 4, d_model: 384, n_blocks: 8, kernel: 51, ffn: 4, dropout: 0.2}
+
+# Used by workers to invent their own next experiment when the queue is empty.
+search:
+  d_model: {nano: [16, 24, 32, 48], mid: [64, 96, 128, 192, 256], large: [256, 384, 512, 768]}
+  n_blocks: {nano: [1, 2, 3], mid: [2, 3, 4, 6], large: [4, 6, 8, 12]}
+  kernel: [5, 9, 15, 25, 51]
+  lookback: {nano: [32, 64, 128], mid: [64, 128, 256], large: [128, 256]}
+  patch: [[2, 1], [4, 2], [8, 4], [16, 8]]
+  ffn: [1, 2, 4]
+  dropout: [0.0, 0.1, 0.2, 0.3]
+  lr: [0.0003, 0.001, 0.003]
+  weight_decay: [0.0, 0.0001, 0.001, 0.01]
+  batch_size: [256, 512, 1024, 2048]
+  prune_sparsity: [0.3, 0.5, 0.7, 0.85]
+  p_distill: 0.25
+  p_prune: 0.15

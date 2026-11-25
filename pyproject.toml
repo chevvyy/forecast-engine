@@ -5,34 +5,23 @@ description = "Minute-bar equity forecasting engine: returns + realized volatili
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-  # --- deep learning (cu128+ wheels required for RTX 5070 Ti / sm_120) ---
-  "torch>=2.7",
-  "lightning>=2.4",            # optional trainer loop; plain PyTorch is fine too
-  # --- data ---
+  # Core of the training loop. Kept small on purpose so a fresh worker installs in minutes.
+  "torch>=2.7",                # cu128+ wheels required for RTX 5070 Ti / sm_120
+  "numpy>=2.0",
   "polars>=1.0",
-  "pyarrow>=17",
-  "duckdb>=1.1",
-  "exchange-calendars>=4.5",
-  # --- market data ---
-  "alpaca-py>=0.30",
-  # --- classical ML / baselines ---
-  "lightgbm>=4.5",
-  "catboost>=1.2",
-  "scikit-learn>=1.5",
-  "statsmodels>=0.14",         # HAR-RV, Diebold-Mariano helpers
-  # --- experiment management ---
-  "optuna>=4.0",
-  "mlflow>=2.16",
-  "psycopg[binary]>=3.2",
-  "hydra-core>=1.3",
-  "pydantic>=2.8",
-  "python-dotenv>=1.0",
-  # --- serving ---
-  "fastapi>=0.115",
-  "uvicorn>=0.30",
+  "pyyaml>=6.0",
+  "onnx>=1.16",                # ONNX export for the phone tier
+  "onnxruntime>=1.19",         # export parity check + CPU latency measurement
 ]
 
 [project.optional-dependencies]
+planned = [
+  # Declared by the original scaffold for later phases; not imported by any code yet.
+  "lightning>=2.4", "pyarrow>=17", "duckdb>=1.1", "exchange-calendars>=4.5", "alpaca-py>=0.30",
+  "lightgbm>=4.5", "catboost>=1.2", "scikit-learn>=1.5", "statsmodels>=0.14", "optuna>=4.0",
+  "mlflow>=2.16", "psycopg[binary]>=3.2", "hydra-core>=1.3", "pydantic>=2.8", "python-dotenv>=1.0",
+  "fastapi>=0.115", "uvicorn>=0.30",
+]
 reference-models = [
   "neuralforecast>=1.7",       # PatchTST / N-HiTS / iTransformer / TSMixer reference impls
 ]
@@ -60,12 +49,20 @@ explicit = true
 [tool.uv.sources]
 torch = { index = "pytorch-cu128" }
 
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/forecast"]
+
 [tool.ruff]
-line-length = 100
+line-length = 110
 target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "N", "SIM", "DTZ"]   # DTZ: forbid naive datetimes
+ignore = ["N803", "N806", "N812", "E501", "E731"]                # math-style names (X, Q, L_model); long table rows
 
 [tool.mypy]
 strict = true

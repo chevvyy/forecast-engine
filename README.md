@@ -4,8 +4,15 @@ A from-scratch forecasting engine for US equities: ingest minute bars, build lea
 models on whichever GPU is free (RTX 5070 Ti 16 GB or RTX 3060 12 GB), and serve predictions to the
 forecast-chat demo.
 
-> Status: **scaffold only.** No implementation code yet. Every module folder contains a `README.md`
-> describing what goes there, its inputs/outputs, and the tests that must exist before it counts as done.
+> Status: **v0 engine + self-improvement loop on branch `loop`.** Data (keyless daily bars), leak-tested
+> features, purged walk-forward evaluation, baselines, one compact model family in three size tiers
+> (phone / 8 GB / 16 GB), pruning, distillation, ONNX export, and a git-based job queue that GPU workers
+> and a scheduled planner share. See `loop/PLANNER.md`, `jobs/README.md`, `configs/loop.yaml` and
+> `experiments/LEADERBOARD.md`. Module READMEs describe the fuller plan; much of it is still backlog.
+
+### Run a worker
+- Windows (5070 Ti): `irm https://raw.githubusercontent.com/chevvyy/forecast-engine/loop/scripts/bootstrap_worker.ps1 | iex`
+- Linux (3060): `bash scripts/bootstrap_worker.sh`
 
 ---
 

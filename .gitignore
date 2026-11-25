@@ -28,3 +28,8 @@ __pycache__/
 .DS_Store
 .vscode/
 .idea/
+
+# loop: local run artifacts stay on the worker; committed champion weights live in models/
+artifacts/
+!models/**
+logs/

@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 import urllib.error
 import urllib.request
@@ -18,7 +19,7 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
-from forecast.utils.common import data_root
+from forecast.utils.common import REPO, data_root
 
 COLS = ["symbol", "t", "open", "high", "low", "close", "volume"]
 _UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"
@@ -84,9 +85,52 @@ def parse_yahoo_chart(symbol: str, payload: dict) -> pl.DataFrame:
     ).unique(subset=["t"], keep="last").sort("t")
 
 
+class RateLimitedError(RuntimeError):
+    """Yahoo kept answering 429 after backing off."""
+
+
+class UnknownSymbolError(RuntimeError):
+    """Yahoo has no such symbol (renamed or delisted). Not worth retrying."""
+
+
+_SYMBOL_RE = re.compile(r"[A-Z0-9^][A-Z0-9.\-=^]{0,11}")
+
+
+def read_symbols(path: str | Path) -> list[str]:
+    """Read a symbol list: one symbol per line, ``#`` comments, blanks ignored, duplicates dropped
+    (first occurrence wins). A relative path is resolved against the repo root."""
+    p = Path(path)
+    if not p.is_absolute():
+        p = REPO / p
+    out: list[str] = []
+    seen: set[str] = set()
+    for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+        s = line.split("#", 1)[0].strip().upper()
+        if not s:
+            continue
+        if not _SYMBOL_RE.fullmatch(s):
+            raise ValueError(f"{p.name}:{n}: not a symbol: {s!r}")
+        if s not in seen:
+            seen.add(s)
+            out.append(s)
+    return out
+
+
+def resolve_symbols(cfg: dict) -> list[str]:
+    """``symbols`` (inline) first, then ``symbols_file``; either or both may be given."""
+    out = [str(s).upper() for s in (cfg.get("symbols") or [])]
+    if cfg.get("symbols_file"):
+        out += read_symbols(cfg["symbols_file"])
+    out = list(dict.fromkeys(out))
+    if not out:
+        raise ValueError("data config names no symbols (symbols / symbols_file)")
+    return out
+
+
 def _yahoo_fetch(symbol: str, interval: str) -> dict:
     rng = "max" if interval == "1d" else "730d"
     last: Exception | None = None
+    limited = 0
     for attempt in range(5):
         host = "query1" if attempt % 2 == 0 else "query2"
         url = (f"https://{host}.finance.yahoo.com/v8/finance/chart/{symbol}"
@@ -95,9 +139,24 @@ def _yahoo_fetch(symbol: str, interval: str) -> dict:
             req = urllib.request.Request(url, headers={"User-Agent": _UA})
             with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310 - fixed https host
                 return json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            last = e
+            if e.code == 404:
+                raise UnknownSymbolError(f"yahoo has no symbol {symbol}") from e
+            if e.code == 429:  # rate limited: wait much longer than for a network blip
+                limited += 1
+                try:
+                    wait = float(e.headers.get("Retry-After", "")) if e.headers else 0.0
+                except ValueError:
+                    wait = 0.0
+                time.sleep(min(max(wait, 15.0 * 2 ** (limited - 1)), 120.0))
+            else:
+                time.sleep(2.0 * (attempt + 1))
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
             last = e
             time.sleep(2.0 * (attempt + 1))
+    if limited >= 3:
+        raise RateLimitedError(f"yahoo rate limit for {symbol}: {last}")
     raise RuntimeError(f"yahoo fetch failed for {symbol}: {last}")
 
 
@@ -106,13 +165,17 @@ def yahoo(symbols: list[str], interval: str = "1d", max_age_h: float = 20.0) -> 
     cache = data_root() / "yahoo" / interval
     cache.mkdir(parents=True, exist_ok=True)
     frames, failed = [], []
+    blocked = False  # once Yahoo keeps answering 429, stop asking for the rest of this call
     for s in symbols:
         p: Path = cache / f"{s}.parquet"
         fresh = p.exists() and (time.time() - p.stat().st_mtime) < max_age_h * 3600
-        if not fresh:
+        if not fresh and not blocked:
             try:
                 parse_yahoo_chart(s, _yahoo_fetch(s, interval)).write_parquet(p)
                 time.sleep(0.4)  # stay polite; this endpoint rate-limits bursts
+            except RateLimitedError as e:  # the remaining symbols use whatever the cache has
+                blocked = True
+                failed.append(f"{s}: {e}")
             except Exception as e:  # keep going with the stale copy if there is one
                 failed.append(f"{s}: {e}")
         if p.exists():
@@ -124,7 +187,7 @@ def yahoo(symbols: list[str], interval: str = "1d", max_age_h: float = 20.0) -> 
 
 def load_bars(cfg: dict) -> pl.DataFrame:
     src = cfg.get("source", "yahoo")
-    symbols = list(cfg["symbols"])
+    symbols = resolve_symbols(cfg)
     if src == "synthetic":
         return synthetic(symbols, int(cfg.get("n_bars", 1500)), int(cfg.get("seed", 0)))
     if src == "yahoo":

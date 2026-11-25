@@ -9,6 +9,8 @@ data:
   symbols: [SPY, QQQ, IWM, DIA, XLK, XLF, XLE, XLV, XLY, XLP, XLI, XLU, XLB, XLRE, XLC,
             AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA, JPM, V, UNH, XOM, JNJ, PG, HD, COST,
             AVGO, LLY, MA, WMT, BAC]
+  # symbols_file: configs/data/universe_wide.txt   # 539 symbols; switching changes the folds: bump eval.version
+  universe_note: "current index members and megacaps: survivorship bias, return skill is optimistic"
 
 task:
   horizons: [1, 5, 20]     # bars ahead

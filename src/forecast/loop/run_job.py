@@ -18,7 +18,7 @@ import numpy as np
 import torch
 import yaml
 
-from forecast.data.sources import load_bars
+from forecast.data.sources import load_bars, resolve_symbols
 from forecast.evaluation import metrics as M
 from forecast.evaluation.splits import holdout_start, walk_forward
 from forecast.features.build import CHANNELS, TAB, Dataset, build
@@ -102,6 +102,10 @@ def run_job(job: dict, cfg: dict | None = None, repo: Path = REPO, device: str |
             init_dir = artifact_dir(job["init_from"], repo)
             if init_dir is None:
                 raise FileNotFoundError(f"parent artifacts for {job['init_from']} not on this machine")
+        # How many symbols were asked for (``symbols`` further down is how many had usable history) and
+        # the config's caveat about how the universe was chosen, so every result carries it.
+        res["universe"] = {"requested": len(resolve_symbols(cfg["data"])),
+                           "note": cfg["data"].get("universe_note")}
         ds, folds, dhash = prepare(cfg, lookback)
         out_dir = repo / "artifacts" / job["id"]
         if out_dir.exists():

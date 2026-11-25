@@ -19,18 +19,38 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
-from forecast.utils.common import REPO, data_root
+from forecast.utils.common import REPO, data_root, interval_seconds
 
 COLS = ["symbol", "t", "open", "high", "low", "close", "volume"]
 _UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"
 
 
-def synthetic(symbols: list[str], n_bars: int = 1500, seed: int = 0) -> pl.DataFrame:
+def _session_starts(n_bars: int, bar_seconds: int) -> tuple[np.ndarray, np.ndarray]:
+    """Bar start times (epoch s) on weekday 14:30-21:00 UTC sessions, and a mask of session-open bars."""
+    per = max(23400 // bar_seconds, 1)
+    day = int(datetime(2024, 1, 1, 14, 30, tzinfo=UTC).timestamp())  # a Monday
+    out: list[int] = []
+    while len(out) < n_bars:
+        if datetime.fromtimestamp(day, tz=UTC).weekday() < 5:
+            out.extend(day + bar_seconds * k for k in range(per))
+        day += 86400
+    t = np.array(out[:n_bars], dtype=np.int64)
+    return t, np.arange(n_bars) % per == 0
+
+
+def synthetic(symbols: list[str], n_bars: int = 1500, seed: int = 0, bar_seconds: int = 86400) -> pl.DataFrame:
     """GARCH(1,1)-style returns with a shared market factor. Volatility clusters, so realized vol is
-    partly predictable while returns are (almost) not: the same shape the real problem has."""
+    partly predictable while returns are (almost) not: the same shape the real problem has.
+    With ``bar_seconds`` below a day the bars sit on weekday sessions and every session opens with an
+    overnight jump, so intraday code paths meet the gaps they must not cross."""
     rng = np.random.default_rng(seed)
     start = int(datetime(2015, 1, 1, tzinfo=UTC).timestamp())
-    ts = [datetime.fromtimestamp(start + 86400 * i, tz=UTC) for i in range(n_bars)]
+    intraday = bar_seconds < 86400
+    if intraday:
+        tsec, opens = _session_starts(n_bars, bar_seconds)
+        ts = [datetime.fromtimestamp(int(x), tz=UTC) for x in tsec]
+    else:
+        ts = [datetime.fromtimestamp(start + 86400 * i, tz=UTC) for i in range(n_bars)]
     mkt = rng.standard_normal(n_bars)
     frames = []
     for s in symbols:
@@ -42,8 +62,13 @@ def synthetic(symbols: list[str], n_bars: int = 1500, seed: int = 0) -> pl.DataF
             var[i] = v
             r[i] = np.sqrt(v) * eps[i]
             v = 4e-6 + 0.10 * r[i] ** 2 + 0.86 * v
-        close = 100.0 * np.exp(np.cumsum(r))
-        open_ = np.concatenate([[100.0], close[:-1]])
+        if intraday:  # overnight jump before each session's first bar, several bars' worth of move
+            jump = np.where(opens, 0.01 * rng.standard_normal(n_bars), 0.0)
+            close = 100.0 * np.exp(np.cumsum(r + jump))
+            open_ = close / np.exp(r)
+        else:
+            close = 100.0 * np.exp(np.cumsum(r))
+            open_ = np.concatenate([[100.0], close[:-1]])
         spread = np.abs(rng.standard_normal(n_bars)) * np.sqrt(var) * 0.5
         high = np.maximum(open_, close) * np.exp(spread)
         low = np.minimum(open_, close) * np.exp(-spread)
@@ -189,7 +214,8 @@ def load_bars(cfg: dict) -> pl.DataFrame:
     src = cfg.get("source", "yahoo")
     symbols = resolve_symbols(cfg)
     if src == "synthetic":
-        return synthetic(symbols, int(cfg.get("n_bars", 1500)), int(cfg.get("seed", 0)))
+        return synthetic(symbols, int(cfg.get("n_bars", 1500)), int(cfg.get("seed", 0)),
+                         interval_seconds(cfg.get("interval", "1d")))
     if src == "yahoo":
         df = yahoo(symbols, cfg.get("interval", "1d"))
         if cfg.get("start"):

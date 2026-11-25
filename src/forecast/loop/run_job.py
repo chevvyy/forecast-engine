@@ -27,7 +27,7 @@ from forecast.models.patchnet import PatchNet, n_params
 from forecast.serving.export import export_onnx
 from forecast.training.compress import magnitude_masks, nonzero_params
 from forecast.training.trainer import fit, predict
-from forecast.utils.common import REPO, device_info, git_sha, seed_everything
+from forecast.utils.common import DAY, REPO, device_info, git_sha, interval_seconds, seed_everything
 
 
 def load_cfg(repo: Path = REPO) -> dict:
@@ -59,6 +59,13 @@ def _slice(ds: Dataset, idx: np.ndarray) -> dict:
     return {"X": ds.X.subset(idx), "tab": ds.tab[idx], "y": ds.y[idx]}
 
 
+def bar_seconds(data_cfg: dict) -> int | None:
+    """Bar length for intraday data, None for daily bars (the Alpaca source is minute bars)."""
+    default = "1m" if data_cfg.get("source") == "alpaca" else "1d"
+    sec = interval_seconds(str(data_cfg.get("interval", default)))
+    return sec if sec < DAY else None
+
+
 def prepare(cfg: dict, lookback: int) -> tuple[Dataset, list, str]:
     bars = load_bars(cfg["data"])
     closes = bars["close"].to_numpy()
@@ -69,7 +76,7 @@ def prepare(cfg: dict, lookback: int) -> tuple[Dataset, list, str]:
     if lookback > max_lb:
         raise ValueError(f"lookback {lookback} exceeds task.max_lookback {max_lb}")
     ds = build(bars, cfg["task"]["horizons"], lookback, cfg["data"].get("benchmark", "SPY"),
-               max_t_end=hs, first_index=max_lb - 1)
+               max_t_end=hs, first_index=max_lb - 1, bar_seconds=bar_seconds(cfg["data"]))
     ev = cfg["eval"]
     folds = walk_forward(ds.t, ds.t_end, ev["n_folds"], ev["val_frac"], ev["embargo_bars"], ev["es_frac"])
     if not folds:

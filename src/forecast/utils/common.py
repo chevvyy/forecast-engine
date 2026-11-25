@@ -59,3 +59,15 @@ def git_sha(repo: Path = REPO) -> str:
 
 def data_root() -> Path:
     return Path(os.environ.get("DATA_ROOT") or REPO / "data")
+
+
+DAY = 86400
+_UNIT = {"m": 60, "h": 3600, "d": DAY}
+
+
+def interval_seconds(interval: str) -> int:
+    """``"1m"`` -> 60, ``"5m"`` -> 300, ``"1h"`` -> 3600, ``"1d"`` -> 86400."""
+    n, unit = interval[:-1], interval[-1:].lower()
+    if unit not in _UNIT or not n.isdigit() or int(n) < 1:
+        raise ValueError(f"unknown bar interval {interval!r} (expected like 1m, 5m, 1h, 1d)")
+    return int(n) * _UNIT[unit]

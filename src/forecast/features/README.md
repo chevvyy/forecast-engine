@@ -1,5 +1,10 @@
 # forecast.features
 
+## What exists
+`build.py`: per-bar channels, lazy windows, labels and label intervals for daily bars, and for intraday
+bars with `bar_seconds` set (a bar is known one bar after its start; no window or label crosses the
+overnight gap or a missing bar; see the module docstring). The table below is the fuller plan.
+
 ## Files to create
 | File | Responsibility |
 |---|---|

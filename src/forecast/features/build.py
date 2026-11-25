@@ -7,6 +7,17 @@ Targets (ADR-0001: returns and realized volatility, never price), both scaled by
 one model works across symbols and regimes:
   y[..., 0] = forward log return over h bars / (rv20 * sqrt(h))
   y[..., 1] = log( forward realized vol over h bars / (rv20 * sqrt(h)) )
+
+Intraday bars (``build(..., bar_seconds=60)``). A bar's ``t`` is its START, so bar i is only known at
+``t`` + one bar; ``Dataset.known`` carries that time and is the earliest moment row i may be used.
+A row exists only if its ``lookback`` window bars (or ``first_index + 1`` bars, if that is more) and its ``max(horizons)`` label bars sit on one unbroken
+bar grid, so no window and no label crosses the overnight gap, a weekend or a missing bar. Where a bar
+does not directly follow the previous one (session open, or after a hole), its return is open-to-close
+instead of close-to-close and its gap channel is 0, so the overnight move enters nothing. The trailing
+statistics (rv20 scale, volume z-score, HAR regressors) do run across sessions, on those intraday
+returns only: a session is too short to warm them up from scratch, and they are trailing, so causal.
+Known gaps: no time-of-day feature, and horizons are counted in bars (the grid rule makes that equal to
+clock time).
 """
 from __future__ import annotations
 
@@ -15,10 +26,21 @@ from dataclasses import dataclass
 import numpy as np
 import polars as pl
 
+from forecast.utils.common import DAY
+
 CHANNELS = ["ret", "abs_ret", "range", "vol_z", "mkt_ret", "gap"]
 TAB = ["log_rv5_rv20", "log_rv60_rv20"]  # HAR-style regressors for the baseline
 WARMUP = 60
 EPS = 1e-8
+
+
+def grid_runs(tsec: np.ndarray, bar_seconds: int) -> np.ndarray:
+    """``run[i]`` = how many consecutive bars, each exactly ``bar_seconds`` after the one before, end
+    at bar i (1 at a session open or right after a missing bar)."""
+    brk = np.ones(len(tsec), dtype=bool)
+    brk[1:] = np.diff(tsec) != bar_seconds
+    pos = np.arange(len(tsec))
+    return pos - np.maximum.accumulate(np.where(brk, pos, 0)) + 1
 
 
 class Windows:
@@ -81,6 +103,7 @@ class Dataset:
     scale: np.ndarray    # [n] float32 rv20 at i (multiply by sqrt(h) to undo the target scaling)
     symbols: list[str]
     horizons: list[int]
+    known: np.ndarray | None = None  # [n] int64 epoch seconds from which row i may be used: t + one bar
 
 
 def _roll_mean(a: np.ndarray, w: int) -> np.ndarray:
@@ -91,12 +114,24 @@ def _roll_mean(a: np.ndarray, w: int) -> np.ndarray:
     return (cs[idx] - cs[lo]) / (idx - lo)
 
 
-def symbol_arrays(o, h, low, c, v, mkt_ret) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Per-bar channels [n, C], tab features [n, T], log returns r [n], rv20 [n]. All causal."""
+def _returns(o: np.ndarray, c: np.ndarray, brk: np.ndarray | None) -> np.ndarray:
+    """Close-to-close log returns; at ``brk`` bars (no bar directly before) open-to-close instead."""
     r = np.zeros(len(c))
     r[1:] = np.log(c[1:] / c[:-1])
+    if brk is not None:
+        r[brk] = np.log(c[brk] / o[brk])
+    return r
+
+
+def symbol_arrays(o, h, low, c, v, mkt_ret,
+                  brk: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Per-bar channels [n, C], tab features [n, T], log returns r [n], rv20 [n]. All causal.
+    ``brk`` (intraday only) marks bars that do not directly follow the previous bar."""
+    r = _returns(o, c, brk)
     gap = np.zeros(len(c))
     gap[1:] = np.log(o[1:] / c[:-1])
+    if brk is not None:
+        gap[brk] = 0.0
     rng = np.log(np.maximum(h, low + EPS) / low)
     lv = np.log1p(np.maximum(v, 0.0))
     m = _roll_mean(lv, 20)
@@ -110,17 +145,22 @@ def symbol_arrays(o, h, low, c, v, mkt_ret) -> tuple[np.ndarray, np.ndarray, np.
 
 
 def build(bars: pl.DataFrame, horizons: list[int], lookback: int, benchmark: str = "SPY",
-          max_t_end: int | None = None, first_index: int = 0) -> Dataset:
+          max_t_end: int | None = None, first_index: int = 0, bar_seconds: int | None = None) -> Dataset:
     """Build the modelling table. ``max_t_end`` drops every row whose label would touch a bar at or
     after that epoch second; the loop uses it to keep the final holdout physically out of reach.
-    ``first_index`` pins the first usable bar so jobs with different lookbacks share identical folds."""
+    ``first_index`` pins the first usable bar so jobs with different lookbacks share identical folds.
+    ``bar_seconds`` (intraday bars only; leave None for daily) switches on the unbroken-grid rule and
+    the session-open handling described in the module docstring. The grid rule asks for
+    ``max(lookback, first_index + 1)`` unbroken bars, so there too ``first_index`` keeps the rows
+    identical across lookbacks."""
     hmax = max(horizons)
+    intraday = bar_seconds is not None
     symbols = sorted(bars["symbol"].unique().to_list())
     bench = bars.filter(pl.col("symbol") == benchmark).sort("t")
     if bench.height:
-        bc = bench["close"].to_numpy()
-        br = np.zeros(len(bc))
-        br[1:] = np.log(bc[1:] / bc[:-1])
+        bt = bench["t"].dt.epoch("s").to_numpy()
+        br = _returns(bench["open"].to_numpy(), bench["close"].to_numpy(),
+                      grid_runs(bt, bar_seconds) == 1 if intraday else None)
         bench = pl.DataFrame({"t": bench["t"], "mkt_ret": br})
     chs, ends, tabs, ys, ts, tes, syms, scs = [], [], [], [], [], [], [], []
     base = 0  # rows of ``ch`` already taken by earlier symbols
@@ -134,12 +174,15 @@ def build(bars: pl.DataFrame, horizons: list[int], lookback: int, benchmark: str
         first = max(WARMUP, lookback - 1, first_index)
         if n < first + hmax + 2:
             continue
+        tsec = d["t"].dt.epoch("s").to_numpy()
+        run = grid_runs(tsec, bar_seconds) if intraday else None
         ch, tab, r, rv20 = symbol_arrays(
             d["open"].to_numpy(), d["high"].to_numpy(), d["low"].to_numpy(), d["close"].to_numpy(),
-            d["volume"].to_numpy(), d["mkt_ret"].to_numpy(),
+            d["volume"].to_numpy(), d["mkt_ret"].to_numpy(), brk=None if run is None else run == 1,
         )
-        tsec = d["t"].dt.epoch("s").to_numpy()
         idx = np.arange(first, n - hmax)
+        if run is not None:  # window bars i-L+1..i and label bars i+1..i+hmax on one unbroken grid
+            idx = idx[(run[idx] >= max(lookback, first_index + 1)) & (run[idx + hmax] > hmax)]
         if max_t_end is not None:
             idx = idx[tsec[idx + hmax] < max_t_end]
         if len(idx) == 0:
@@ -162,5 +205,8 @@ def build(bars: pl.DataFrame, horizons: list[int], lookback: int, benchmark: str
     if not chs:
         raise ValueError("no usable rows: not enough history for the lookback/horizons requested")
     X = Windows(np.concatenate(chs), np.concatenate(ends).astype(np.int64), lookback)
-    return Dataset(X, np.concatenate(tabs), np.concatenate(ys), np.concatenate(ts),
-                   np.concatenate(tes), np.concatenate(syms), np.concatenate(scs), symbols, list(horizons))
+    t = np.concatenate(ts)
+    # A daily bar's stamp is its date or session open, so "one day later" is a safe time for its close.
+    return Dataset(X, np.concatenate(tabs), np.concatenate(ys), t,
+                   np.concatenate(tes), np.concatenate(syms), np.concatenate(scs), symbols, list(horizons),
+                   known=t + (bar_seconds or DAY))

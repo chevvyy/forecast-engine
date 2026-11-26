@@ -1,0 +1,18 @@
+tier: mid
+kind: train
+model:
+  d_model: 64
+  dropout: 0.2
+  ffn: 1
+  kernel: 9
+  lookback: 256
+  n_blocks: 3
+  patch: 2
+  stride: 1
+train: {}
+note: mutation of 20261126-z7-mid-k9-batch2048-s11
+seed: 241273
+id: 20261126-224549-pc-5070ti-34ea
+origin: worker
+worker: pc-5070ti
+attempts: 1

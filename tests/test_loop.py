@@ -309,3 +309,25 @@ def test_non_finite_score_is_a_failed_run_and_never_a_champion(tmp_path, monkeyp
     bad = _fake_result("b", "nano", cfg, score=float("nan"))
     assert champions([bad, good])["nano"]["id"] == "g" and champions([good, bad])["nano"]["id"] == "g"
     assert not champions([bad])
+
+
+def test_prune_job_uses_its_parents_shape_and_lookback(tmp_path, monkeypatch):
+    """2026-11-26: prune jobs built their windows at the tier preset's lookback (64 for nano) although the
+    parent they finetune had lookback 256, so the pruned model never saw the bars it was trained on, and
+    the result recorded the preset shape instead of the parent's."""
+    from forecast.loop import run_job as rj
+
+    a, _ = _setup(tmp_path)
+    cfg = rj.load_cfg(a)
+    parent = rj.run_job({"id": "t1", "tier": "nano", "model": {"lookback": 64, "d_model": 12}}, cfg, a, "cpu")
+    assert parent["status"] == "ok", parent.get("error")
+    seen = []
+    real = rj.build
+    monkeypatch.setattr(rj, "build", lambda bars, horizons, lookback, *a_, **k: (
+        seen.append(lookback), real(bars, horizons, lookback, *a_, **k))[1])
+    res = rj.run_job({"id": "p1", "tier": "nano", "kind": "prune", "init_from": "t1", "sparsity": 0.5},
+                     cfg, a, "cpu")
+    assert res["status"] == "ok", res.get("error")
+    assert seen == [64]                                   # the preset says 32
+    assert res["model"]["lookback"] == 64 and res["model"]["d_model"] == 12
+    assert res["params"] == parent["params"]

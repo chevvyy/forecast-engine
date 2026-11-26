@@ -109,6 +109,13 @@ def run_job(job: dict, cfg: dict | None = None, repo: Path = REPO, device: str |
             init_dir = artifact_dir(job["init_from"], repo)
             if init_dir is None:
                 raise FileNotFoundError(f"parent artifacts for {job['init_from']} not on this machine")
+            # The model that is pruned / finetuned is the parent, so its shape (not the tier preset) is
+            # what this job trains and reports, and its lookback is what the windows must be built at.
+            # Until 2026-11-26 the windows used the preset's lookback: a 256-bar nano champion was
+            # finetuned and scored on 64-bar windows, and every prune result recorded the preset shape.
+            parent = load_model(init_dir / "fold0.pt").cfg
+            mcfg = {k: parent.get(k, v) for k, v in mcfg.items()}
+            lookback = max(lookback, int(mcfg["lookback"])) if teacher_dir else int(mcfg["lookback"])
         # How many symbols were asked for (``symbols`` further down is how many had usable history) and
         # the config's caveat about how the universe was chosen, so every result carries it.
         res["universe"] = {"requested": len(resolve_symbols(cfg["data"])),

@@ -1,0 +1,13 @@
+tier: mid
+kind: prune
+init_from: 20261126-z7-mid-k9-batch2048-s11
+sparsity: 0.5
+train:
+  lr: 0.0003
+  max_epochs: 15
+note: prune + finetune champion
+seed: 560649
+id: 20261126-224301-pc-5070ti-4a60
+origin: worker
+worker: pc-5070ti
+attempts: 1

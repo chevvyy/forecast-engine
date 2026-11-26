@@ -6,3 +6,5 @@ seed: 11
 note: 'runbook: distil the large champion into the mid preset (never tried). Teacher
   is about level with the baseline, so expect little.'
 origin: planner
+worker: pc-5070ti
+attempts: 1

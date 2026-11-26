@@ -69,6 +69,13 @@ class Git:
         return False
 
 
+def error_pause(fails: int) -> int:
+    """Seconds to wait after ``fails`` failed jobs in a row. One failure costs nothing (a bad job must not
+    slow the queue); a run of them is a broken machine or broken code, and retrying every few seconds
+    only floods the branch with identical error results. Capped so a fix is picked up within 15 minutes."""
+    return 0 if fails < 2 else min(60 * 2 ** (fails - 2), 900)
+
+
 def new_id(worker: str, rng: random.Random) -> str:
     return f"{datetime.now(UTC):%Y%m%d-%H%M%S}-{worker}-{rng.randrange(16**4):04x}"
 
@@ -209,7 +216,7 @@ def main() -> None:
     git = Git(REPO, cfg["branch"], enabled=not a.no_git)
     rng = random.Random()
     recover(a.name, git, REPO)
-    rev, n = git.src_rev(), 0
+    rev, n, fails = git.src_rev(), 0, 0
     while True:
         try:
             status = step(a.name, a.tiers.split(","), git, rng, allow_cpu=a.allow_cpu)
@@ -222,10 +229,14 @@ def main() -> None:
             return
         if status.startswith("idle"):
             time.sleep(300)
+        fails = fails + 1 if status.endswith(" error") else 0
         git.sync()
         if git.src_rev() != rev:
             print("code changed upstream; restarting", flush=True)
             raise SystemExit(RESTART)
+        if error_pause(fails):
+            print(f"{fails} failed jobs in a row; waiting {error_pause(fails)} s", flush=True)
+            time.sleep(error_pause(fails))
 
 
 if __name__ == "__main__":

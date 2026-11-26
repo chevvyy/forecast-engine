@@ -10,6 +10,7 @@ dependencies = [
   "numpy>=2.0",
   "polars>=1.0",
   "pyyaml>=6.0",
+  "tzdata>=2024.1",            # IANA zone database: Windows ships none, and UTC datetimes need zoneinfo
   "onnx>=1.16",                # ONNX export for the phone tier
   "onnxruntime>=1.19",         # export parity check + CPU latency measurement
 ]

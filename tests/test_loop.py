@@ -110,3 +110,35 @@ def test_failed_job_is_recorded_and_crashed_claims_are_recovered(tmp_path):
     assert ga.publish("fake crash", ["jobs"])
     recover("wa", ga, a)
     assert not list((a / "jobs" / "running").glob("*.yaml"))
+
+
+def test_time_zone_database_is_a_declared_dependency():
+    # Windows has no system zone database. Without the tzdata package, polars cannot hand back a UTC
+    # datetime and every job on pc-5070ti failed in run_job.prepare (981 runs, 2026-11-25/26).
+    import tomllib
+
+    deps = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["dependencies"]
+    assert any(d.split(">")[0].split("=")[0].strip() == "tzdata" for d in deps)
+
+
+def test_utc_datetimes_work_without_a_system_zone_database():
+    # Reproduces the Windows failure on any OS: hide the system zone files, then do what prepare() does.
+    import sys
+
+    import pytest
+
+    pytest.importorskip("tzdata")
+    code = ("import zoneinfo, polars as pl; from datetime import UTC, datetime; zoneinfo.reset_tzpath(to=[]); "
+            "s = pl.Series([datetime(2024, 1, 2, tzinfo=UTC)]).cast(pl.Datetime('us', 'UTC')); "
+            "assert s.max() == datetime(2024, 1, 2, tzinfo=UTC); "
+            "s.dt.convert_time_zone('America/New_York').max()")
+    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr[-500:]
+
+
+def test_error_pause_backs_off_only_on_repeated_failures():
+    from forecast.loop.worker import error_pause
+
+    assert error_pause(0) == 0 and error_pause(1) == 0
+    assert [error_pause(k) for k in (2, 3, 4, 5)] == [60, 120, 240, 480]
+    assert error_pause(50) == 900

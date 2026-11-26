@@ -23,6 +23,16 @@ def main() -> int:
         except Exception as e:
             ok = False
             print(f"[FAIL] CUDA present but unusable: {e}")
+    try:
+        # Windows has no system zone database; without the tzdata package every job dies when polars
+        # hands back a UTC datetime (981 failed runs on 2026-11-25/26).
+        import zoneinfo
+        zoneinfo.ZoneInfo("UTC")
+        zoneinfo.ZoneInfo("America/New_York")
+        print("[ok] time zone database")
+    except Exception as e:
+        ok = False
+        print(f"[FAIL] time zone database: {e!r}. Run `uv sync` (it installs tzdata) and re-run.")
     cfg = load_cfg()
     try:
         from forecast.data import alpaca, sources

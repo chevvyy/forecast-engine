@@ -1,0 +1,18 @@
+tier: large
+kind: train
+model:
+  d_model: 384
+  dropout: 0.3
+  ffn: 4
+  kernel: 51
+  lookback: 128
+  n_blocks: 4
+  patch: 4
+  stride: 2
+train: {}
+seed: 641424
+note: mutation of 20261126-w7-large-regularised-s11
+id: 20261126-100329-pc-5070ti-763a
+origin: worker
+worker: pc-5070ti
+attempts: 1

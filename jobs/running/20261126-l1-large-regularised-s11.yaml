@@ -15,3 +15,5 @@ seed: 11
 note: 'large preset stops after 6-7 epochs with return skill about -5%: smaller, more
   dropout, more weight decay, lower lr.'
 origin: planner
+worker: pc-5070ti
+attempts: 1

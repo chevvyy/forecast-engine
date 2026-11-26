@@ -1,0 +1,134 @@
+{
+  "coverage_80": [
+    [
+      0.8015,
+      0.7952
+    ],
+    [
+      0.7906,
+      0.7923
+    ],
+    [
+      0.7912,
+      0.7918
+    ]
+  ],
+  "cpu_ms_per_forecast": 0.076,
+  "data_hash": "d2410d5f9b37",
+  "device": "cuda",
+  "dm": {
+    "all": [
+      -2.9084510444770326,
+      0.0036322404129374088
+    ],
+    "ret": [
+      -0.6931795937763552,
+      0.48819685263350476
+    ],
+    "vol": [
+      -3.5128575984294668,
+      0.00044331500364722955
+    ]
+  },
+  "eval_version": 1,
+  "finished": "2026-11-26T02:40:25+00:00",
+  "fits_tier": true,
+  "folds": [
+    {
+      "epochs": 9,
+      "es_pinball": 0.2298758178949356,
+      "n_train": 51706,
+      "n_val": 6265,
+      "peak_vram_gb": 0.131
+    },
+    {
+      "epochs": 9,
+      "es_pinball": 0.23694643378257751,
+      "n_train": 57341,
+      "n_val": 6265,
+      "peak_vram_gb": 0.131
+    },
+    {
+      "epochs": 8,
+      "es_pinball": 0.23985779285430908,
+      "n_train": 62976,
+      "n_val": 6265,
+      "peak_vram_gb": 0.132
+    }
+  ],
+  "git": "7bfd8b2f",
+  "gpu": "NVIDIA GeForce RTX 5070 Ti",
+  "horizons": [
+    1,
+    5,
+    20
+  ],
+  "id": "20261126-024011-pc-5070ti-ba1c",
+  "job": {
+    "attempts": 1,
+    "id": "20261126-024011-pc-5070ti-ba1c",
+    "kind": "train",
+    "model": {
+      "d_model": 32,
+      "dropout": 0.3,
+      "ffn": 2,
+      "kernel": 25,
+      "lookback": 32,
+      "n_blocks": 3,
+      "patch": 2,
+      "stride": 1
+    },
+    "note": "mutation of 20261126-022140-pc-5070ti-4a31",
+    "origin": "worker",
+    "seed": 276712,
+    "tier": "nano",
+    "train": {},
+    "worker": "pc-5070ti"
+  },
+  "kind": "train",
+  "minutes": 0.2,
+  "model": {
+    "d_model": 32,
+    "dropout": 0.3,
+    "ffn": 2,
+    "kernel": 25,
+    "lookback": 32,
+    "n_blocks": 3,
+    "patch": 2,
+    "stride": 1
+  },
+  "nonzero_params": 19070,
+  "onnx_bytes": 92772,
+  "onnx_max_abs_diff": 3.5762786865234375e-07,
+  "params": 19070,
+  "peak_vram_gb": 0.132,
+  "pinball": {
+    "ret_baseline": 0.2976769208908081,
+    "ret_model": 0.2968441843986511,
+    "vol_baseline": 0.18466970324516296,
+    "vol_har": 0.18466970324516296,
+    "vol_model": 0.17960438132286072,
+    "vol_unconditional": 0.19192714989185333
+  },
+  "rank_ic_h1": -0.007388281197022573,
+  "score": 0.015113264322280884,
+  "skill_ret": 0.002797424793243408,
+  "skill_vol": 0.02742910385131836,
+  "status": "ok",
+  "symbols": 35,
+  "tier": "nano",
+  "train": {
+    "batch_size": 512,
+    "distill_alpha": 0.5,
+    "grad_clip": 1.0,
+    "lr": 0.001,
+    "max_epochs": 40,
+    "patience": 5,
+    "weight_decay": 0.0001
+  },
+  "universe": {
+    "note": "current index members and megacaps: survivorship bias, return skill is optimistic",
+    "requested": 35
+  },
+  "worker": "pc-5070ti"
+}

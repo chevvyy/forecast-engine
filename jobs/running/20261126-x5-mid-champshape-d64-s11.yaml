@@ -14,3 +14,5 @@ seed: 11
 note: 'the nano champion''s shape (lookback 256, patch 4/2, dropout 0.2) at d_model
   64: every mid run so far is patch 2/1 at lookback 128 and scores below zero'
 origin: planner
+worker: pc-5070ti
+attempts: 1

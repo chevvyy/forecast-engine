@@ -13,3 +13,5 @@ model:
 seed: 12
 note: second seed re-run of the v2 nano champion
 origin: planner
+worker: pc-5070ti
+attempts: 1

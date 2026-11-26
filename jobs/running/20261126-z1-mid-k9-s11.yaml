@@ -14,3 +14,5 @@ seed: 11
 note: seed re-run of the new mid champion 20261126-192624-pc-5070ti-066b (+0.0221,
   one seed)
 origin: planner
+worker: pc-5070ti
+attempts: 1

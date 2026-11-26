@@ -1,6 +1,0 @@
-id: 20261126-p3-mid-preset-s11
-tier: mid
-kind: train
-seed: 11
-origin: planner
-note: 're-queue of 20261125-p3-mid-preset-s11 (failed on missing tzdata): tier preset, fixed seed, first real-data check and seed-noise estimate'

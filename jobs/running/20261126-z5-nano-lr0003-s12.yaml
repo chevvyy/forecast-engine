@@ -16,3 +16,5 @@ seed: 12
 note: second seed of lr 0.0003 at batch 512 (x3 scored +0.0435 with seed 11); compare
   with batch 2048 (3 seeds, mean +0.039)
 origin: planner
+worker: pc-5070ti
+attempts: 1

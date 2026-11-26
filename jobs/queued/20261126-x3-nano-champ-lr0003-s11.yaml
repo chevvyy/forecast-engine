@@ -1,0 +1,18 @@
+id: 20261126-x3-nano-champ-lr0003-s11
+tier: nano
+kind: train
+model:
+  d_model: 32
+  n_blocks: 3
+  kernel: 25
+  lookback: 256
+  patch: 4
+  stride: 2
+  ffn: 2
+  dropout: 0.2
+train:
+  lr: 0.0003
+seed: 11
+note: 'most v2 runs had their best epoch first (1800 steps) and negative return skill:
+  does a 3x lower learning rate change that?'
+origin: planner

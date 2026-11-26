@@ -1,0 +1,11 @@
+id: 20261126-x7-prune-nano-champ-70
+tier: nano
+kind: prune
+init_from: 20261126-104135-pc-5070ti-3409
+sparsity: 0.7
+train:
+  lr: 0.0003
+  max_epochs: 15
+seed: 11
+note: 'runbook: prune + finetune the nano champion, 70%'
+origin: planner

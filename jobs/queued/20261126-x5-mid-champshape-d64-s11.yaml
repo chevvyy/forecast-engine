@@ -1,0 +1,16 @@
+id: 20261126-x5-mid-champshape-d64-s11
+tier: mid
+kind: train
+model:
+  d_model: 64
+  n_blocks: 3
+  kernel: 25
+  lookback: 256
+  patch: 4
+  stride: 2
+  ffn: 2
+  dropout: 0.2
+seed: 11
+note: 'the nano champion''s shape (lookback 256, patch 4/2, dropout 0.2) at d_model
+  64: every mid run so far is patch 2/1 at lookback 128 and scores below zero'
+origin: planner

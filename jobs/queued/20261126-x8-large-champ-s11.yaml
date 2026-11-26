@@ -1,0 +1,16 @@
+id: 20261126-x8-large-champ-s11
+tier: large
+kind: train
+model:
+  d_model: 512
+  n_blocks: 4
+  kernel: 51
+  lookback: 128
+  patch: 8
+  stride: 4
+  ffn: 4
+  dropout: 0.3
+seed: 11
+note: 'seed re-run of the v2 large champion 20261126-104349-pc-5070ti-1662 (+0.0059,
+  DM p 0.60: level with the baseline)'
+origin: planner

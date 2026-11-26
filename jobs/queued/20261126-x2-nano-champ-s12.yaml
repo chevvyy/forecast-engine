@@ -1,0 +1,15 @@
+id: 20261126-x2-nano-champ-s12
+tier: nano
+kind: train
+model:
+  d_model: 32
+  n_blocks: 3
+  kernel: 25
+  lookback: 256
+  patch: 4
+  stride: 2
+  ffn: 2
+  dropout: 0.2
+seed: 12
+note: second seed re-run of the v2 nano champion
+origin: planner

@@ -16,3 +16,5 @@ seed: 11
 note: 'most v2 runs had their best epoch first (1800 steps) and negative return skill:
   does a 3x lower learning rate change that?'
 origin: planner
+worker: pc-5070ti
+attempts: 1

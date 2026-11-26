@@ -17,3 +17,5 @@ seed: 11
 note: 'both slow-downs together: x3 (lr 0.0003) and x4 (batch 2048) each gained about
   +0.008 but every fold still stopped at its first epoch'
 origin: planner
+worker: pc-5070ti
+attempts: 1

@@ -78,3 +78,28 @@ def test_yahoo_parser_adjusts_and_drops_gaps():
     assert df.height == 2
     assert df["close"].to_list() == [5.0, 12.0] and df["high"].to_list() == [5.5, 13.0]
     assert str(df["t"].dtype) == "Datetime(time_unit='us', time_zone='UTC')"
+
+
+def test_inference_batch_shrinks_for_wide_models_and_forecasts_do_not_change():
+    """2026-11-26: predict() used 4096 rows whatever the model, so a wide large-tier model ran out of
+    VRAM in inference after training fine. The batch now follows the model's widest activation."""
+    from forecast.features.build import CHANNELS, TAB
+    from forecast.training.trainer import predict_batch
+
+    def net(**kw):
+        return PatchNet(len(CHANNELS), len(TAB), 3, 5, **kw)
+
+    nano = net(lookback=128, patch=2, stride=1, d_model=32, n_blocks=3, kernel=25, ffn=2)
+    assert predict_batch(nano) == 4096                      # small models keep the old batch
+    c = dict(lookback=256, patch=2, stride=1, n_blocks=1, kernel=5, ffn=4)
+    oom, spill = net(d_model=512, **c), net(d_model=384, **c)   # the two runs that went wrong
+    for m in (oom, spill):
+        b = predict_batch(m)
+        assert 64 <= b < 4096
+        assert b * 255 * m.cfg["d_model"] * 4 * 4 <= 2**29  # widest activation at most 0.5 GB
+    assert predict_batch(oom) < predict_batch(spill)
+    torch.manual_seed(0)
+    x, tab = np.random.default_rng(0).standard_normal((300, len(CHANNELS), 128)).astype(np.float32), \
+        np.zeros((300, len(TAB)), np.float32)
+    a, b = predict(nano, x, tab, "cpu"), predict(nano, x, tab, "cpu", batch=64)
+    assert a.shape == (300, 3, 2, 5) and np.allclose(a, b, atol=1e-5)

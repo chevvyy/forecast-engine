@@ -21,9 +21,21 @@ def pinball(pred: torch.Tensor, y: torch.Tensor, q: torch.Tensor) -> torch.Tenso
     return torch.maximum(q * d, (q - 1.0) * d).mean()
 
 
+def predict_batch(model: PatchNet, cap: int = 4096, budget: int = 2**27) -> int:
+    """Rows per inference batch: at most ``cap``, fewer for a model whose widest activation
+    (tokens x d_model x ffn values per row) would exceed ``budget`` values per batch (0.5 GB as float32).
+    A fixed 4096 made inference, not training, the peak of every large job: on 2026-11-26 a 255-token,
+    d_model 512 model asked for 7.97 GB in one activation and died, and a d_model 384 one spilled past
+    the card's 16 GB and took 50 minutes. Forecasts do not depend on the batch size."""
+    c = model.cfg
+    tokens = max((c["lookback"] - c["patch"]) // c["stride"] + 1, 1)
+    return int(max(64, min(cap, budget // (tokens * c["d_model"] * c["ffn"]))))
+
+
 @torch.no_grad()
-def predict(model: PatchNet, X: np.ndarray, tab: np.ndarray, device: str, batch: int = 4096) -> np.ndarray:
+def predict(model: PatchNet, X: np.ndarray, tab: np.ndarray, device: str, batch: int | None = None) -> np.ndarray:
     model.eval()
+    batch = batch or predict_batch(model)
     out = []
     for i in range(0, len(X), batch):
         xb = torch.from_numpy(X[i:i + batch]).to(device)

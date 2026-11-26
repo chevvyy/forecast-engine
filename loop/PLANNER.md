@@ -20,6 +20,7 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
 
 ## Each cycle
 1. **Sync and test.** Check out `loop`, install deps, run `pytest -q` and `ruff check .`.
+   Install `tzdata` too (`pip install tzdata`), or the Windows zone-database test is skipped.
 2. **Health.**
    - `loop/workers/*.json`: a worker whose `seen` is older than 6 h is down. Note it for the summary.
    - `results/*.json` with `status: error`: read `error`/`traceback`, fix the cause in code (with a test),
@@ -57,6 +58,8 @@ still applies; with Alpaca, 539 symbols is about 4 minutes of requests at the fr
 - [ ] First real-data triage: confirm jobs succeed on the real workers with Yahoo data; fix whatever
       broke (paths on Windows, VRAM accounting, data gaps). Until `results/` shows `ok` runs from a real
       GPU, this outranks everything else.
+      2026-11-25 17:20: first breakage fixed (missing `tzdata` on Windows, 1064 failed runs). Still open
+      until an `ok` run lands; check the first results for path, VRAM and data-gap problems.
 - [ ] **Wide universe (Dev asked for as many tickers as possible, 2026-11-25).** Three parts, in order:
       (a) [x] lazy window loading (done 2026-11-25: `features.build.Windows`; `tests/test_windows.py`
       asserts equality with the old eager builder; 520 synthetic symbols x 5400 bars at lookback 256 build

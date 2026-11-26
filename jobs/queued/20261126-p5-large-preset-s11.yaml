@@ -1,0 +1,6 @@
+id: 20261126-p5-large-preset-s11
+tier: large
+kind: train
+seed: 11
+origin: planner
+note: 're-queue of 20261125-p5-large-preset-s11 (failed on missing tzdata): tier preset, fixed seed, first real-data check and seed-noise estimate'

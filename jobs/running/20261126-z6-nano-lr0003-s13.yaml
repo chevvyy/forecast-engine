@@ -15,3 +15,5 @@ train:
 seed: 13
 note: third seed of lr 0.0003 at batch 512
 origin: planner
+worker: pc-5070ti
+attempts: 1

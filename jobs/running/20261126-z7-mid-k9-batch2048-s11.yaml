@@ -16,3 +16,5 @@ seed: 11
 note: does batch 2048, which helped nano, also help the mid champion shape? compare
   with z1 (same seed, batch 512)
 origin: planner
+worker: pc-5070ti
+attempts: 1

@@ -1,0 +1,18 @@
+tier: nano
+kind: train
+model:
+  d_model: 24
+  dropout: 0.1
+  ffn: 2
+  kernel: 9
+  lookback: 64
+  n_blocks: 2
+  patch: 4
+  stride: 2
+train: {}
+seed: 147621
+note: mutation of 20261126-p2-nano-preset-s12
+id: 20261126-005546-pc-5070ti-cf6d
+origin: worker
+worker: pc-5070ti
+attempts: 1

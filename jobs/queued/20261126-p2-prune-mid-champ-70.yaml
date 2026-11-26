@@ -1,0 +1,11 @@
+id: 20261126-p2-prune-mid-champ-70
+tier: mid
+kind: prune
+init_from: 20261126-p3-mid-preset-s11
+sparsity: 0.7
+train:
+  lr: 0.0003
+  max_epochs: 15
+seed: 11
+note: 'runbook: prune + finetune the mid champion, 70%'
+origin: planner

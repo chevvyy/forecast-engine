@@ -55,11 +55,13 @@ report, record the source in results and keep them on separate leaderboards. The
 still applies; with Alpaca, 539 symbols is about 4 minutes of requests at the free plan's rate.
 
 ## Backlog (ordered; tick items off here as they land)
-- [ ] First real-data triage: confirm jobs succeed on the real workers with Yahoo data; fix whatever
-      broke (paths on Windows, VRAM accounting, data gaps). Until `results/` shows `ok` runs from a real
-      GPU, this outranks everything else.
-      2026-11-25 17:20: first breakage fixed (missing `tzdata` on Windows, 1064 failed runs). Still open
-      until an `ok` run lands; check the first results for path, VRAM and data-gap problems.
+- [x] First real-data triage (done 2026-11-25 21:15): `ok` runs from pc-5070ti on Alpaca daily bars since
+      2026-11-26 00:22 UTC. Two breakages found and fixed: missing `tzdata` on Windows (1064 failed
+      runs), and VRAM accounting: the worker counted its own cached GPU memory as busy, so after its
+      first 6 GB job it ran only nano jobs (`common.usable_vram_gb`, cache emptied after every job).
+      Paths and data gaps: nothing seen (all 35 symbols usable, identical folds in every run).
+      Next cycle must confirm the VRAM fix on the real machine: `vram_free_gb` in the heartbeat back
+      near 14, and mid/large results arriving again. If not, something else is using that GPU.
 - [ ] **Wide universe (Dev asked for as many tickers as possible, 2026-11-25).** Three parts, in order:
       (a) [x] lazy window loading (done 2026-11-25: `features.build.Windows`; `tests/test_windows.py`
       asserts equality with the old eager builder; 520 synthetic symbols x 5400 bars at lookback 256 build
@@ -107,9 +109,24 @@ still applies; with Alpaca, 539 symbols is about 4 minutes of requests at the fr
       (c) [ ] switch workers that have keys onto minute jobs. Needs Dev: create Alpaca paper keys and put
       `ALPACA_API_KEY` and `ALPACA_SECRET_KEY` in that worker's `.env` (log under "Needs Dev" until a
       heartbeat shows `alpaca_keys: true`).
+- [ ] **Worker-invented distil and prune jobs carry no seed and are never checked against earlier runs**
+      (found 2026-11-25 21:15): 142 distil runs were 11 distinct jobs and 84 prune runs were 23, each
+      repeat giving the identical score. Give them a random seed and skip a proposal whose
+      (tier, kind, model, train, seed, teacher/parent, sparsity) already has a result. Same change:
+      nano jobs take ~15 s and each makes two commits (about 7 commits a minute, 3000+ in four hours),
+      so let the worker commit claim and result together for self-invented jobs, or space them out.
 - [ ] Seed-noise estimate per tier; promotion must beat the champion by more than that noise.
+      First number (2026-11-25 21:15): the nano champion's configuration over 15 seeds scores mean
+      +0.022, sd 0.005, range +0.014..+0.031. The leaderboard champion is the best of those seeds, so
+      its own score overstates the configuration by about 0.009. Not yet in code: the leaderboard
+      should rank configurations by their seed mean, and `propose` should re-run a would-be champion.
 - [ ] LightGBM quantile baseline on tabular features (the scaffold's "first real model"); deep models
       must be compared against it in every result. Bumps `eval.version`.
+      Same version bump: a fairer return baseline. Returns are scaled by rv20 and the return baseline
+      is unconditional quantiles, so a model can earn "return skill" purely by forecasting volatility
+      better than rv20 (wider or narrower quantiles), with no directional skill. Add a baseline that
+      rescales the unconditional return quantiles by the HAR volatility forecast, and report return
+      skill against the better of the two. Until then read return skill together with `rank_ic_h1`.
 - [ ] Richer causal features: sector-ETF context per stock, cross-sectional ranks, calendar encodings.
 - [ ] Serving: a small read-only FastAPI app in `src/forecast/serving/` that loads a tier champion from
       `models/` and returns quantiles + its validation metrics; then, on a `loop` branch of

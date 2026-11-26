@@ -1,0 +1,8 @@
+id: 20261126-d1-distill-large-into-mid
+tier: mid
+kind: distill
+teacher: 20261126-003324-pc-5070ti-6eb8
+seed: 11
+note: 'runbook: distil the large champion into the mid preset (never tried). Teacher
+  is about level with the baseline, so expect little.'
+origin: planner

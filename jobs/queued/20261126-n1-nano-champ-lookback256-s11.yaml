@@ -1,0 +1,16 @@
+id: 20261126-n1-nano-champ-lookback256-s11
+tier: nano
+kind: train
+model:
+  d_model: 32
+  n_blocks: 3
+  kernel: 25
+  lookback: 256
+  patch: 2
+  stride: 1
+  ffn: 2
+  dropout: 0.3
+seed: 11
+note: 'nano champion shape at lookback 256 (the search stops at 128, and 128 beat
+  64 and 32). Compare with the 15-seed spread at 128: mean +0.022, sd 0.005.'
+origin: planner

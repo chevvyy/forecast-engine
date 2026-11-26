@@ -1,0 +1,15 @@
+id: 20261126-n2-nano-champ-lookback256-s12
+tier: nano
+kind: train
+model:
+  d_model: 32
+  n_blocks: 3
+  kernel: 25
+  lookback: 256
+  patch: 2
+  stride: 1
+  ffn: 2
+  dropout: 0.3
+seed: 12
+note: second seed of n1
+origin: planner

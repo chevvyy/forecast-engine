@@ -1,0 +1,13 @@
+id: 20261126-m2-mid-narrow-s11
+tier: mid
+kind: train
+model:
+  d_model: 64
+  n_blocks: 3
+  patch: 2
+  stride: 1
+  dropout: 0.3
+seed: 11
+note: 'narrower mid: on nano, width beyond 32 did not help and the large preset overfits.
+  Is mid capacity needed at all?'
+origin: planner

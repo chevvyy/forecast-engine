@@ -5,6 +5,7 @@ can recompute it, so two workers never fight over a shared file.
 """
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 from forecast.utils.common import REPO, read_json
@@ -29,6 +30,8 @@ def champions(results: list[dict], eval_version: int | None = None) -> dict[str,
     for r in results:
         if r.get("status") != "ok" or not r.get("fits_tier"):
             continue
+        if not math.isfinite(r.get("score", math.nan)):
+            continue   # nothing compares greater than NaN: such a champion would never be replaced
         if eval_version is not None and r.get("eval_version", 1) != eval_version:
             continue   # scores from a different evaluation protocol are not comparable
         t = r["tier"]

@@ -10,6 +10,7 @@ Exit code 3 means "code changed upstream, restart me" (the run_worker scripts do
 from __future__ import annotations
 
 import argparse
+import json
 import random
 import shutil
 import subprocess
@@ -22,6 +23,7 @@ import yaml
 from forecast.data import alpaca
 from forecast.loop.leaderboard import champions, load_results
 from forecast.loop.run_job import artifact_dir, load_cfg, run_job
+from forecast.models.patchnet import train_vram_gb
 from forecast.utils.common import REPO, device_info, release_vram, write_json
 
 RESTART = 3
@@ -80,17 +82,40 @@ def new_id(worker: str, rng: random.Random) -> str:
     return f"{datetime.now(UTC):%Y%m%d-%H%M%S}-{worker}-{rng.randrange(16**4):04x}"
 
 
-def propose(cfg: dict, results: list[dict], tiers: list[str], rng: random.Random, repo: Path = REPO) -> dict:
-    """Invent the next experiment: mutate the tier champion, or distil a bigger champion into a
-    smaller tier, or prune-and-finetune the champion."""
-    s, ch = cfg["search"], champions(results, cfg["eval"].get("version", 1))
-    done = sum(1 for r in results if r.get("status") == "ok")
-    order = ["nano", "mid", "large"]
-    # Make sure every tier this worker serves has at least one run before exploring.
-    missing = [t for t in tiers if t not in ch]
-    tier = missing[0] if missing else rng.choice(tiers)
-    if missing:
-        return {"tier": tier, "kind": "train", "note": "tier preset (first run)"}
+# A distil or prune configuration is run with at most this many seeds per eval.version. Before
+# 2026-11-26 these jobs had no seed at all: 142 distil runs were 11 distinct jobs, score for score.
+MAX_REPEATS = 3
+# A self-invented job in a tier whose budget is at most this is not announced with a claim commit:
+# nobody else can claim an id this worker just made up, and at one claim plus one result per job the
+# short jobs wrote about 7 commits a minute (3000+ in four hours on 2026-11-25).
+QUIET_CLAIM_MINUTES = 20
+
+
+def signature(job: dict, cfg: dict, seed: bool = True) -> str:
+    """What a job trains, with tier presets and train defaults filled in, so two jobs written
+    differently but training the same thing compare equal. ``seed=False`` names the configuration."""
+    tier = cfg["tiers"][job["tier"]]
+    sig = {"tier": job["tier"], "kind": job.get("kind", "train"),
+           "model": {**tier["model"], **(job.get("model") or {})},
+           "train": {**cfg["train"], **(job.get("train") or {})},
+           "teacher": job.get("teacher"), "init_from": job.get("init_from"), "sparsity": job.get("sparsity")}
+    if seed:
+        sig["seed"] = int(job.get("seed", 1337))
+    return json.dumps(sig, sort_keys=True, default=str)
+
+
+def fits_vram(job: dict, cfg: dict) -> bool:
+    """False if training this shape would need more GPU memory than its tier allows (estimate)."""
+    tier = cfg["tiers"][job["tier"]]
+    limit = tier.get("max_train_vram_gb")
+    if limit is None or job.get("init_from"):   # a pruned model has its parent's shape, which already ran
+        return True
+    batch = {**cfg["train"], **(job.get("train") or {})}.get("batch_size", 512)
+    return train_vram_gb({**tier["model"], **(job.get("model") or {})}, batch) <= float(limit)
+
+
+def _draw(cfg: dict, ch: dict, tier: str, done: int, rng: random.Random, repo: Path) -> dict:
+    s, order = cfg["search"], ["nano", "mid", "large"]
     base = dict(ch[tier]["model"])
     roll = rng.random()
     bigger = [t for t in order[order.index(tier) + 1:] if t in ch and artifact_dir(ch[t]["id"], repo)]
@@ -115,8 +140,45 @@ def propose(cfg: dict, results: list[dict], tiers: list[str], rng: random.Random
             model[key] = v
     if model["lookback"] < 2 * model["patch"]:
         model["patch"], model["stride"] = 4, 2
-    return {"tier": tier, "kind": "train", "model": model, "train": train, "seed": rng.randrange(10**6),
+    return {"tier": tier, "kind": "train", "model": model, "train": train,
             "note": f"mutation of {ch[tier]['id']}"}
+
+
+def propose(cfg: dict, results: list[dict], tiers: list[str], rng: random.Random, repo: Path = REPO) -> dict:
+    """Invent the next experiment: mutate the tier champion, or distil a bigger champion into a
+    smaller tier, or prune-and-finetune the champion. Every proposal carries a seed. A proposal is
+    dropped and redrawn if the same job already has a result, if it is a distil / prune configuration
+    that already ran ``MAX_REPEATS`` times, or if its training would not fit the tier's VRAM."""
+    ver = cfg["eval"].get("version", 1)
+    ch = champions(results, ver)
+    done = sum(1 for r in results if r.get("status") == "ok")
+    # Make sure every tier this worker serves has at least one run before exploring.
+    missing = [t for t in tiers if t not in ch]
+    if missing:
+        return {"tier": missing[0], "kind": "train", "note": "tier preset (first run)"}
+    tier = rng.choice(tiers)
+    exact: set[str] = set()
+    repeats: dict[str, int] = {}
+    for r in results:
+        if r.get("eval_version", 1) != ver:
+            continue
+        try:
+            exact.add(signature(r["job"], cfg))
+            key = signature(r["job"], cfg, seed=False)
+        except (KeyError, TypeError, ValueError):
+            continue   # results are worker-written data: skip anything malformed
+        repeats[key] = repeats.get(key, 0) + 1
+    for _ in range(20):
+        job = _draw(cfg, ch, tier, done, rng, repo)
+        job["seed"] = rng.randrange(10**6)
+        if job["kind"] != "train" and repeats.get(signature(job, cfg, seed=False), 0) >= MAX_REPEATS:
+            continue
+        if signature(job, cfg) in exact or not fits_vram(job, cfg):
+            continue
+        return job
+    # Nothing new that fits came up: another seed of the champion's shape is still information.
+    return {"tier": tier, "kind": "train", "model": dict(ch[tier]["model"]), "seed": rng.randrange(10**6),
+            "note": f"seed re-run of {ch[tier]['id']}"}
 
 
 def runnable(job: dict, cfg: dict, tiers: list[str], vram_free: float, repo: Path) -> bool:
@@ -157,7 +219,8 @@ def step(name: str, tiers: list[str], git: Git, rng: random.Random, repo: Path =
     dst.write_text(yaml.safe_dump(job, sort_keys=False), encoding="utf-8")
     if src is not None:
         src.unlink()
-    if not git.publish(f"loop: {name} claims {job['id']}", ["jobs"]):
+    quiet = src is None and float(cfg["tiers"][job["tier"]]["max_minutes"]) <= QUIET_CLAIM_MINUTES
+    if not quiet and not git.publish(f"loop: {name} claims {job['id']}", ["jobs"]):
         return f"lost claim race for {job['id']}"
     res = run_job(job, cfg, repo, device)
     # Without this the allocator keeps the job's high-water mark and the next VRAM check sees a busy GPU

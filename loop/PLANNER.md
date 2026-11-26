@@ -93,20 +93,24 @@ together with an `eval.version` bump (new bars move the holdout and every fold).
       Still open: the list was not re-verified against a second full source (281 of the 503 S&P rows
       rest on one; Wikipedia could not be fetched from the planner on 2026-11-26 either), and what
       Alpaca really answers for an unknown symbol is assumed (400/404/422 or an empty page), not seen.
-- [ ] **Worker-invented distil and prune jobs carry no seed and are never checked against earlier runs**
-      (found 2026-11-25 21:15): 142 distil runs were 11 distinct jobs and 84 prune runs were 23, each
-      repeat giving the identical score. Give them a random seed and skip a proposal whose
-      (tier, kind, model, train, seed, teacher/parent, sparsity) already has a result. Same change:
-      nano jobs take ~15 s and each makes two commits (about 7 commits a minute, 3000+ in four hours),
-      so let the worker commit claim and result together for self-invented jobs, or space them out.
-      Moved to the top on 2026-11-26: on the wide universe each exact duplicate costs minutes, not
-      seconds. Until it lands, `search.p_distill` / `p_prune` are lowered to 0.1 / 0.05 (were 0.25 / 0.15).
-      Same change, same function (`worker.propose`): do not propose a shape whose training cannot fit
-      the tier's VRAM. Inference no longer causes it (`trainer.predict_batch`, 2026-11-26), but at batch
-      512 a 255-token, 8-block model needs roughly 10 GB at d_model 384 and about 14 GB at 512 (v1
-      measurements), so `patch: [2, 1]` with lookback 256 and d_model >= 512 still cannot train on 16 GB.
-      And treat a non-finite score as a failed run (a NaN first run would become a tier's champion
-      and never be replaced, since nothing compares greater than NaN).
+- [x] **Worker-invented jobs: seeds, no repeats, VRAM guard, fewer commits, no NaN champions** (done
+      2026-11-26 05:15; found 2026-11-25 when 142 distil runs were 11 distinct jobs). `worker.propose` now
+      gives every proposal a seed and redraws one that (a) already has a result of this `eval.version`
+      (`worker.signature`: tier, kind, model and train with presets filled in, teacher/parent, sparsity,
+      seed; failed results count), (b) is a distil / prune configuration already run `MAX_REPEATS` = 3
+      times, or (c) would not fit the tier's `max_train_vram_gb` by `patchnet.train_vram_gb`
+      (0.8 GB + batch x tokens x d_model x blocks x (8 + 8 ffn) bytes, fitted to pc-5070ti's peaks: of 49
+      past mid/large runs it would have refused the 2 that did not fit and none that did; it refuses 246
+      of the 1536 large grid points and 55 of 2880 mid). After 20 redraws it re-runs the champion's shape
+      with a new seed. A self-invented job in a tier with a budget of 20 minutes or less (nano) makes one
+      commit, not a claim plus a result; queued jobs and long jobs are still claimed first, so a running
+      mid/large job stays visible. A non-finite loss is a failed run (`run_job`), and `champions` ignores
+      a non-finite score. `search.p_prune` is back at 0.15; `p_distill` stays 0.1 on purpose (see the
+      comment in `configs/loop.yaml`). Correction to the earlier note here: at batch 512 a 255-token,
+      8-block, ffn 4 model needs about 16 GB at d_model 384 (measured 16.6), not 10.
+      **Next cycle must check on the real machine** that the worker restarted on this code (results'
+      `git` newer than this commit), that self-invented distil / prune results carry `job.seed`, and
+      that nano results arrive without a preceding "claims" commit.
 - [ ] **Minute bars (Dev asked, for short-horizon forecasts).** Three parts, in order:
       (a) [x] Alpaca ingestor (done 2026-11-25: `forecast.data.alpaca`, `data.source: alpaca`;
       resumable per-symbol-month parquet, `feed=sip`, nothing newer than 16 minutes, ~170 requests/min,
@@ -144,6 +148,10 @@ together with an `eval.version` bump (new bars move the holdout and every fold).
       +0.022, sd 0.005, range +0.014..+0.031. The leaderboard champion is the best of those seeds, so
       its own score overstates the configuration by about 0.009. Not yet in code: the leaderboard
       should rank configurations by their seed mean, and `propose` should re-run a would-be champion.
+      On version 2 the noise looks larger: two seeds of one nano shape scored +0.009 and -0.007.
+      Same function, found 2026-11-26: a mutation starts from the champion's model shape but not from
+      its training settings (`lr`, `weight_decay`, `batch_size` fall back to the defaults unless they
+      are the mutated keys), so the search cannot hill-climb on those. Inherit `job.train` of the champion.
 - [ ] LightGBM quantile baseline on tabular features (the scaffold's "first real model"); deep models
       must be compared against it in every result. Bumps `eval.version`.
       Same version bump: a fairer return baseline. Returns are scaled by rv20 and the return baseline

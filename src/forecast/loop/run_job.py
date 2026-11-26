@@ -153,6 +153,9 @@ def run_job(job: dict, cfg: dict | None = None, repo: Path = REPO, device: str |
         lm, lu, lh, tt = (np.concatenate(a) for a in (L_model, L_unc, L_har, T_all))
         ret_m, ret_b = lm[..., 0].mean(), lu[..., 0].mean()
         vol_m, vol_b = lm[..., 1].mean(), min(lu[..., 1].mean(), lh[..., 1].mean())
+        if not np.isfinite([ret_m, ret_b, vol_m, vol_b]).all():
+            # A diverged model is a failed run, not a score (a NaN score could never be beaten or ranked).
+            raise FloatingPointError(f"non-finite loss (ret {ret_m}, vol {vol_m}): the model diverged")
         best_base = np.stack([lu[..., 0], np.where(lh[..., 1].mean() <= lu[..., 1].mean(), lh[..., 1], lu[..., 1])],
                              axis=-1)
         hmax = max(ds.horizons)

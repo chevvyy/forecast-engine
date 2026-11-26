@@ -187,3 +187,125 @@ def test_worker_releases_vram_after_every_job(tmp_path, monkeypatch):
     assert len(calls) == 2   # after a finished job and after a failed one
     from forecast.utils.common import release_vram
     release_vram()           # harmless without a GPU
+
+
+def _fake_result(rid: str, tier: str, cfg: dict, score: float = 0.01, **job) -> dict:
+    job = {"kind": "train", **job, "id": rid, "tier": tier}
+    return {"id": rid, "status": "ok", "fits_tier": True, "tier": tier, "kind": job["kind"], "score": score,
+            "eval_version": cfg["eval"]["version"], "job": job,
+            "model": {**cfg["tiers"][tier]["model"], **(job.get("model") or {})}}
+
+
+def test_proposals_carry_a_seed_and_are_not_repeated(tmp_path):
+    """2026-11-25: worker-invented distil and prune jobs had no seed and were never compared with
+    earlier runs, so 142 distil runs were 11 distinct jobs with identical scores."""
+    from forecast.loop.worker import MAX_REPEATS, propose, signature
+
+    cfg = yaml.safe_load((ROOT / "configs" / "loop.yaml").read_text())
+    res = [_fake_result("n0", "nano", cfg, seed=1), _fake_result("m0", "mid", cfg, seed=1)]
+    (tmp_path / "models" / "m0").mkdir(parents=True)
+    (tmp_path / "models" / "m0" / "fold0.pt").touch()
+    cfg["search"].update(p_distill=1.0, p_prune=0.0)
+    seen = []
+    for k in range(MAX_REPEATS):
+        job = propose(cfg, res, ["nano"], random.Random(k), tmp_path)
+        assert job["kind"] == "distill" and job["teacher"] == "m0" and isinstance(job["seed"], int)
+        seen.append(job["seed"])
+        res.append(_fake_result(f"d{k}", "nano", cfg, 0.0, **{k_: v for k_, v in job.items() if k_ != "tier"}))
+    assert len(set(seen)) == MAX_REPEATS          # same configuration, different seeds
+    # The configuration has had its seeds: the worker must now do something else.
+    for k in range(20):
+        job = propose(cfg, res, ["nano"], random.Random(100 + k), tmp_path)
+        assert job["kind"] == "train" and "seed" in job, job
+    # Prune proposals are seeded too.
+    (tmp_path / "models" / "n0").mkdir()
+    (tmp_path / "models" / "n0" / "fold0.pt").touch()
+    cfg["search"].update(p_distill=0.0, p_prune=1.0)
+    job = propose(cfg, res, ["nano"], random.Random(5), tmp_path)
+    assert job["kind"] == "prune" and isinstance(job["seed"], int)
+    # An exact repeat (same job, same seed) is redrawn; an error result counts as "already tried" too.
+    cfg["search"].update(p_distill=0.0, p_prune=0.0)
+    first = propose(cfg, res, ["nano"], random.Random(7), tmp_path)
+    tried = {**_fake_result("x", "nano", cfg, **{k: v for k, v in first.items() if k != "tier"}), "status": "error"}
+    again = propose(cfg, res + [tried], ["nano"], random.Random(7), tmp_path)
+    assert signature(again, cfg) != signature(first, cfg)
+    # Spelling out a preset value does not make a job new; runs of another eval.version do not count.
+    explicit = {**first, "model": {**cfg["tiers"]["nano"]["model"], **first["model"]}}
+    assert signature(explicit, cfg) == signature(first, cfg)
+    old = {**tried, "eval_version": cfg["eval"]["version"] - 1}
+    assert signature(propose(cfg, res + [old], ["nano"], random.Random(7), tmp_path), cfg) == signature(first, cfg)
+    # Results are worker-written data: a malformed one must not stop the worker proposing.
+    assert propose(cfg, res + [{"status": "error", "eval_version": cfg["eval"]["version"], "job": "junk"},
+                               {"status": "error", "eval_version": cfg["eval"]["version"]}],
+                   ["nano"], random.Random(7), tmp_path)["tier"] == "nano"
+
+
+def test_proposed_shapes_fit_the_tier_vram():
+    """A 255-token, d_model 512, 8-block mutation cannot train in 16 GB at batch 512; proposing it
+    costs a failed or spilled run every time (2026-11-26)."""
+    from forecast.loop.worker import fits_vram, propose
+    from forecast.models.patchnet import train_vram_gb
+
+    # Measured training peaks on pc-5070ti (batch, lookback, patch, stride, d_model, n_blocks, ffn) -> GB.
+    measured = [((512, 256, 2, 1, 384, 8, 4), 16.6), ((512, 256, 2, 1, 256, 8, 4), 11.1),
+                ((512, 256, 8, 4, 768, 8, 4), 8.7), ((512, 256, 8, 4, 512, 8, 4), 6.0),
+                ((512, 256, 8, 4, 384, 12, 4), 5.5), ((512, 256, 8, 4, 384, 8, 2), 2.7),
+                ((512, 256, 8, 4, 384, 8, 1), 1.9)]
+    for (bs, lb, pt, st, d, nb, ffn), gb in measured:
+        est = train_vram_gb({"lookback": lb, "patch": pt, "stride": st, "d_model": d, "n_blocks": nb, "ffn": ffn}, bs)
+        assert abs(est - gb) < 1.25, (est, gb)
+    cfg = yaml.safe_load((ROOT / "configs" / "loop.yaml").read_text())
+    big = {"tier": "large", "model": {"lookback": 256, "patch": 2, "stride": 1, "d_model": 512, "n_blocks": 8}}
+    assert not fits_vram(big, cfg)
+    assert fits_vram({"tier": "large"}, cfg) and fits_vram({"tier": "mid"}, cfg) and fits_vram({"tier": "nano"}, cfg)
+    assert not fits_vram({"tier": "large", "train": {"batch_size": 2048}}, cfg)   # 15.9 GB and spilled, measured
+    # Mutations of a champion that sits next to the limit never leave it.
+    res = [_fake_result("l0", "large", cfg, model=big["model"] | {"d_model": 256}),
+           _fake_result("m0", "mid", cfg, model={"lookback": 256, "patch": 2, "stride": 1, "d_model": 192})]
+    rng = random.Random(3)
+    jobs = [propose(cfg, res, ["mid", "large"], rng, ROOT / "no-such-dir") for _ in range(400)]
+    assert all(fits_vram(j, cfg) for j in jobs)
+    assert len({j["tier"] for j in jobs}) == 2 and all("seed" in j for j in jobs)
+
+
+def test_short_self_invented_jobs_make_one_commit_not_two(tmp_path):
+    """Nano jobs took 15 s and each wrote a claim commit and a result commit: 3000+ commits in four
+    hours (2026-11-25). A claim only matters for a queued job, which another worker could take."""
+    a, _ = _setup(tmp_path)
+    ga = Git(a, "loop")
+    rng = random.Random(4)
+
+    def subjects() -> list[str]:
+        return subprocess.run(["git", "log", "--format=%s", "origin/loop"], cwd=a, capture_output=True,
+                              text=True, check=True).stdout.splitlines()
+
+    assert "q1 ok" in step("wa", ["nano"], ga, rng, repo=a, device="cpu", allow_cpu=True)
+    assert sum("claims q1" in s for s in subjects()) == 1            # queued job: still claimed first
+    n = len(subjects())
+    s = step("wa", ["nano"], ga, rng, repo=a, device="cpu", allow_cpu=True)   # invented, budget 15 min
+    assert " ok" in s and len(subjects()) == n + 1 and "claims" not in subjects()[0]
+    assert not list((a / "jobs" / "running").glob("*.yaml"))
+    assert len(list((a / "jobs" / "done").glob("*.yaml"))) == 2
+    n = len(subjects())
+    s = step("wa", ["mid"], ga, rng, repo=a, device="cpu", allow_cpu=True)    # invented, budget 30 min
+    assert " ok" in s and len(subjects()) == n + 2                   # long jobs stay visible while running
+    assert not subprocess.run(["git", "status", "--porcelain"], cwd=a, capture_output=True, text=True).stdout
+
+
+def test_non_finite_score_is_a_failed_run_and_never_a_champion(tmp_path, monkeypatch):
+    """Nothing compares greater than NaN, so a diverged first run would become a tier's champion
+    and never be replaced."""
+    import numpy as np
+
+    from forecast.loop import run_job as rj
+
+    a, _ = _setup(tmp_path)
+    cfg = rj.load_cfg(a)
+    real = rj.predict
+    monkeypatch.setattr(rj, "predict", lambda *x, **k: np.full_like(real(*x, **k), np.nan))
+    res = rj.run_job({"id": "nan1", "tier": "nano"}, cfg, a, "cpu")
+    assert res["status"] == "error" and "non-finite" in res["error"] and "score" not in res
+    good = _fake_result("g", "nano", cfg, score=-0.5)
+    bad = _fake_result("b", "nano", cfg, score=float("nan"))
+    assert champions([bad, good])["nano"]["id"] == "g" and champions([good, bad])["nano"]["id"] == "g"
+    assert not champions([bad])

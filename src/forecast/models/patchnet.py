@@ -61,3 +61,14 @@ class PatchNet(nn.Module):
 
 def n_params(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters())
+
+
+def train_vram_gb(cfg: dict, batch_size: int) -> float:
+    """Rough peak GPU memory of one training step under bf16 autocast, in GB. Each block keeps about
+    8 + 8 * ffn bytes per (row, token, channel) for the backward pass. Fitted to pc-5070ti's recorded
+    peaks (2026-11-26, runs where training and not inference was the peak; within about 1 GB between
+    2 and 16 GB), e.g. batch 512, 255 tokens, d_model 384, 8 blocks, ffn 4: measured 16.6 (past the 16 GB card), estimate 15.7.
+    Used only to avoid proposing shapes that cannot fit a tier; ``fits_tier`` still uses the measured peak."""
+    tokens = max((int(cfg["lookback"]) - int(cfg["patch"])) // int(cfg["stride"]) + 1, 1)
+    values = int(batch_size) * tokens * int(cfg["d_model"]) * int(cfg["n_blocks"])
+    return 0.8 + values * (8 + 8 * int(cfg["ffn"])) / 2**30

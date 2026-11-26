@@ -69,7 +69,8 @@ search:
   weight_decay: [0.0, 0.0001, 0.001, 0.01]
   batch_size: [256, 512, 1024, 2048]
   prune_sparsity: [0.3, 0.5, 0.7, 0.85]
-  # Lowered from 0.25 / 0.15 on 2026-11-26: these jobs carry no seed, so repeats are exact duplicates
-  # (PLANNER.md backlog), and on the wide universe each duplicate costs minutes. Restore when that is fixed.
+  # Share of self-invented jobs that distil / prune. Each such job now carries a seed and a configuration
+  # is run at most 3 times (worker.MAX_REPEATS), so the 2026-11-26 lowering to 0.1 / 0.05 is undone for
+  # prune. Distil stays low while no bigger tier's champion scores above the smaller tier's.
   p_distill: 0.1
-  p_prune: 0.05
+  p_prune: 0.15

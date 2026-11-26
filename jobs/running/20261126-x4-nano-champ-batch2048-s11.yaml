@@ -15,3 +15,5 @@ train:
 seed: 11
 note: 'same question from the other side: 4x fewer, less noisy steps per epoch'
 origin: planner
+worker: pc-5070ti
+attempts: 1

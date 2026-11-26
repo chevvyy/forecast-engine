@@ -1,0 +1,18 @@
+tier: mid
+kind: train
+model:
+  d_model: 64
+  dropout: 0.3
+  ffn: 2
+  kernel: 51
+  lookback: 128
+  n_blocks: 6
+  patch: 2
+  stride: 1
+train: {}
+seed: 920348
+note: mutation of 20261126-m2-mid-narrow-s11
+id: 20261126-042823-pc-5070ti-7cb0
+origin: worker
+worker: pc-5070ti
+attempts: 1

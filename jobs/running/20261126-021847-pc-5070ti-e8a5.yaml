@@ -1,0 +1,18 @@
+tier: nano
+kind: train
+model:
+  d_model: 24
+  dropout: 0.3
+  ffn: 2
+  kernel: 9
+  lookback: 128
+  n_blocks: 3
+  patch: 2
+  stride: 1
+train: {}
+seed: 856630
+note: mutation of 20261126-020710-pc-5070ti-46de
+id: 20261126-021847-pc-5070ti-e8a5
+origin: worker
+worker: pc-5070ti
+attempts: 1

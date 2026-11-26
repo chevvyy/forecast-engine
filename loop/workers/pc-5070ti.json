@@ -2,9 +2,9 @@
   "alpaca_keys": true,
   "device": "cuda",
   "gpu": "NVIDIA GeForce RTX 5070 Ti",
-  "last": "20261126-033656-pc-5070ti-4555 ok",
-  "seen": "2026-11-26T03:37:28+00:00",
-  "vram_free_gb": 1.59,
+  "last": "20261126-033731-pc-5070ti-bc61 ok",
+  "seen": "2026-11-26T03:37:48+00:00",
+  "vram_free_gb": 1.65,
   "vram_total_gb": 15.92,
   "worker": "pc-5070ti"
 }

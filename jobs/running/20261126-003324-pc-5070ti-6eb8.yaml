@@ -1,0 +1,12 @@
+tier: large
+kind: prune
+init_from: 20261126-001646-pc-5070ti-0afc
+sparsity: 0.7
+train:
+  lr: 0.0003
+  max_epochs: 15
+note: prune + finetune champion
+id: 20261126-003324-pc-5070ti-6eb8
+origin: worker
+worker: pc-5070ti
+attempts: 1

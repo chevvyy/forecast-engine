@@ -13,3 +13,5 @@ seed: 11
 note: 'eval v2 (539 symbols): the v1 nano champion shape. Does its volatility skill
   over HAR carry over to symbols it was not selected on?'
 origin: planner
+worker: pc-5070ti
+attempts: 1

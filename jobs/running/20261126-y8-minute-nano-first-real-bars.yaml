@@ -6,3 +6,5 @@ seed: 11
 note: 'first job on real Alpaca minute bars (configs/loop_minute.yaml: 10 symbols
   from 2026-06-01). A failure here is information, not a blocker.'
 origin: planner
+worker: pc-5070ti
+attempts: 1

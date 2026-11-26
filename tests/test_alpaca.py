@@ -273,3 +273,58 @@ def test_end_pin_applies_to_every_source():
     assert end_exclusive({"end": "2015-06-30"}) == datetime(2015, 7, 1, tzinfo=UTC)
     assert cut["t"].max() == datetime(2015, 6, 30, tzinfo=UTC) and cut.height < full.height
     assert cut.equals(full.filter(pl.col("t") < datetime(2015, 7, 1, tzinfo=UTC)))
+
+
+def test_pinned_minute_load_fetches_nothing_past_the_pin_and_freezes_the_adjustment(api, monkeypatch):
+    """Minute track (2026-11-26): under ``data.end`` a job must not download bars it will drop, must not
+    re-ask for anything once the store reaches the pin, and a split or dividend AFTER the pin must not
+    change the pinned bars (Alpaca adjusts as of the day it is asked)."""
+    from forecast.data.sources import load_bars
+
+    monkeypatch.setenv("ALPACA_API_KEY", CREDS[0])
+    monkeypatch.setenv("ALPACA_SECRET_KEY", CREDS[1])
+    cfg = {"source": "alpaca", "symbols": ["SPY", "QQQ"], "start": "2024-01-15", "end": "2024-03-01"}
+    pin = datetime(2024, 3, 2, tzinfo=UTC)
+    df = load_bars(cfg)
+    assert df["t"].max() == datetime(2024, 3, 1, 20, 30, tzinfo=UTC)          # 15:30 New York on data.end
+    ends = [datetime.fromisoformat(q["end"].replace("Z", "+00:00")) for _, q in api.requests]
+    assert max(ends) < pin                                                    # bars and factors alike
+    assert alpaca.stored("SPY")["t"].max() == df["t"].max()                   # nothing newer on disk
+    assert df["close"].min() == pytest.approx(100.0) and df["close"].max() == pytest.approx(100.0)
+    n = len(api.requests)
+    assert load_bars(cfg).equals(df) and len(api.requests) == n               # second job: no request
+
+    # Later a 2:1 split happens after the pin: the server now reports every earlier adjusted close halved.
+    real = alpaca.urllib.request.urlopen
+
+    def urlopen(req, timeout=0):
+        page = json.loads(real(req, timeout).read())
+        if "adjustment=all" in req.full_url:
+            for b in page["bars"]:
+                b.update({k: b[k] / 2 for k in ("o", "h", "l", "c")})
+        return io.BytesIO(json.dumps(page).encode())
+
+    monkeypatch.setattr(alpaca.urllib.request, "urlopen", urlopen)
+    assert load_bars(cfg).equals(df)                                          # cached factors: unchanged
+    # A machine that first sees these bars only after that split still gets the bars as of the pin.
+    late = api.root.parents[1] / "late"
+    monkeypatch.setenv("DATA_ROOT", str(late))
+    assert load_bars(cfg).equals(df)
+    # Without a pin the old behaviour stays: adjusted as of now, so the later split shows.
+    unpinned = alpaca.load(["SPY", "QQQ"], START, NOW)
+    assert unpinned["close"].max() == pytest.approx(50.0) and unpinned["t"].max() > df["t"].max()
+    # A pin that is still in the future pins nothing yet: it loads up to the delay like an unpinned call.
+    monkeypatch.setenv("DATA_ROOT", str(late.parent / "future"))
+    assert alpaca.load(["SPY", "QQQ"], START, NOW, end=datetime(2999, 1, 1, tzinfo=UTC))["t"].max() == unpinned["t"].max()
+
+
+def test_has_session_minute():
+    u = lambda *a: datetime(*a, tzinfo=UTC)  # noqa: E731
+    assert alpaca.has_session_minute(u(2024, 3, 1, 14, 30), u(2024, 3, 1, 14, 30))       # Friday 09:30 NY
+    assert not alpaca.has_session_minute(u(2024, 3, 1, 21, 0), u(2024, 3, 1, 23, 59))    # Friday evening
+    assert not alpaca.has_session_minute(u(2024, 3, 1, 21, 0), u(2024, 3, 4, 14, 29))    # over the weekend
+    assert alpaca.has_session_minute(u(2024, 3, 1, 21, 0), u(2024, 3, 4, 14, 30))        # Monday's first bar
+    assert alpaca.has_session_minute(u(2024, 3, 8, 20, 59), u(2024, 3, 11, 13, 29))      # Friday 15:59 NY
+    assert not alpaca.has_session_minute(u(2024, 3, 8, 21, 0), u(2024, 3, 11, 13, 29))   # DST began 03-10
+    assert alpaca.has_session_minute(u(2024, 3, 8, 21, 0), u(2024, 3, 11, 13, 30))       # 09:30 EDT
+    assert not alpaca.has_session_minute(u(2024, 3, 5), u(2024, 3, 4))                   # empty range

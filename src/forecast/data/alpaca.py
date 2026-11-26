@@ -9,6 +9,8 @@ What is on disk (``<DATA_ROOT>/alpaca/1Min/<SYMBOL>/``):
   is not asked for twice. These files are the resume manifest: a crash loses at most the month in flight.
 - ``YYYY-MM.partial.parquet``: the month that is still open. Each run fetches only what is newer than
   its last bar and rewrites it; it is replaced by the final file once the month has ended.
+  ``YYYY-MM.through`` beside it is written by a pinned load (``end``): the open month has been asked for
+  up to that minute.
 
 Raw bars are stored on purpose (docs/DATA_SOURCES.md, pitfalls 1 and 2): a provider-adjusted month goes
 stale at the next split or dividend, and a cache mixing months adjusted on different days shows fake
@@ -37,6 +39,7 @@ import urllib.request
 from datetime import UTC, date, datetime, timedelta
 from datetime import time as dtime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import polars as pl
 
@@ -155,14 +158,33 @@ def _write(df: pl.DataFrame, path: Path) -> None:
     os.replace(tmp, path)
 
 
+def has_session_minute(lo: datetime, hi: datetime) -> bool:
+    """Does ``lo <= t <= hi`` contain a minute that ``regular_session`` would keep? (Weekday, 09:30 to
+    15:59 New York; holidays are not known here, so a holiday still counts as a session.)"""
+    day = lo.astimezone(ZoneInfo("America/New_York")).replace(hour=0, minute=0, second=0, microsecond=0)
+    while day <= hi:
+        if day.weekday() < 5 and max(lo, day.replace(hour=9, minute=30)) <= min(hi, day.replace(hour=15, minute=59)):
+            return True
+        day = (day + timedelta(days=1)).replace(hour=0)   # wall-clock midnight, also across a DST change
+    return False
+
+
 def ingest(symbols: list[str], start: datetime, now: datetime | None = None,
-           creds: tuple[str, str] | None = None) -> dict:
+           creds: tuple[str, str] | None = None, end: datetime | None = None) -> dict:
     """Bring the raw minute store up to date. Safe to interrupt and re-run: finished months are skipped,
-    the open month is extended from its last bar. Returns counts for the log (no data, no keys)."""
+    the open month is extended from its last bar. Returns counts for the log (no data, no keys).
+
+    ``end`` (exclusive) is the data pin: nothing at or after it is asked for, so a pinned job stops
+    downloading bars it would drop anyway. A range with no regular-session minute in it (an evening, a
+    weekend) is not asked for at all, and once the open month has been asked for up to the pin,
+    ``YYYY-MM.through`` next to it says so, so a symbol whose last minutes before the pin are missing is
+    not asked for them again: after the first pinned job, a pinned job makes no bar request."""
     creds = creds or credentials()
     if creds is None:
         raise MissingKeysError("ALPACA_API_KEY / ALPACA_SECRET_KEY not set (environment or .env)")
     cutoff = ((now or datetime.now(UTC)) - DELAY).replace(second=0, microsecond=0)
+    if end is not None:
+        cutoff = min(cutoff, end.astimezone(UTC) - timedelta(minutes=1))
     start = start.astimezone(UTC)
     stats = {"months_fetched": 0, "months_skipped": 0, "bars": 0, "failed": []}
     for s in symbols:
@@ -176,11 +198,15 @@ def ingest(symbols: list[str], start: datetime, now: datetime | None = None,
                 continue
             have = pl.read_parquet(partial) if partial.exists() else pl.DataFrame(schema=SCHEMA)
             lo = max(m0, start)
+            through = folder / f"{m0:%Y-%m}.through"   # set once the open month has been asked up to a pin
             if have.height:
                 lo = max(lo, have["t"].max() + timedelta(minutes=1))
+            if partial.exists() and through.exists():
+                lo = max(lo, datetime.fromisoformat(through.read_text(encoding="utf-8").strip())
+                         + timedelta(minutes=1))
             hi = min(m1 - timedelta(minutes=1), cutoff)
             try:
-                new = regular_session(fetch_bars(s, lo, hi, creds)) if lo <= hi else have.clear()
+                new = regular_session(fetch_bars(s, lo, hi, creds)) if has_session_minute(lo, hi) else have.clear()
             except Exception as e:  # keep what is on disk, carry on with the next symbol
                 stats["failed"].append(f"{s} {m0:%Y-%m}: {type(e).__name__}: {e}")
                 break
@@ -188,8 +214,11 @@ def ingest(symbols: list[str], start: datetime, now: datetime | None = None,
             if m1 - timedelta(minutes=1) <= cutoff:   # the month is over: freeze it
                 _write(df, final)
                 partial.unlink(missing_ok=True)
+                through.unlink(missing_ok=True)
             else:
                 _write(df, partial)
+                if end is not None and hi == end.astimezone(UTC) - timedelta(minutes=1):
+                    through.write_text(hi.isoformat(), encoding="utf-8")
             stats["months_fetched"] += 1
             stats["bars"] += new.height
     return stats
@@ -203,6 +232,29 @@ def adjustment_factors(symbol: str, start: datetime, end: datetime, creds: tuple
                         pl.col("close").alias(name))
     j = daily("raw", "raw").join(daily("all", "adj"), on="day", how="inner")
     return j.select("day", (pl.col("adj") / pl.col("raw")).alias("factor")).sort("day")
+
+
+def pinned_factors(symbol: str, start: datetime, end: datetime, creds: tuple[str, str]) -> pl.DataFrame:
+    """``adjustment_factors`` for days before the pin ``end`` (exclusive), as of the pin, fetched once.
+
+    Alpaca adjusts as of the day it is asked, so a dividend or split after the pin rescales every earlier
+    factor and the "same" pinned bars would change from one job to the next. Two things stop that:
+    the factors are divided by the factor of the last day before the pin (so that day is 1.0, which is
+    what "adjusted as of the pin" means, whenever they are fetched), and they are stored under
+    ``<DATA_ROOT>/alpaca/factors/`` in a file named after symbol, first day and pin, which is never
+    fetched again. An empty answer is not stored (it may be a symbol that is still being listed)."""
+    path = data_root() / "alpaca" / "factors" / f"{symbol}_{start:%Y%m%d}_{end:%Y%m%d%H%M}.parquet"
+    if path.exists():
+        return pl.read_parquet(path)
+    f = adjustment_factors(symbol, start, end - timedelta(minutes=1), creds)
+    if not f.height:
+        return f
+    f = f.with_columns(pl.col("factor") / pl.col("factor").last())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    f.write_parquet(tmp)
+    os.replace(tmp, path)
+    return f
 
 
 def adjust(bars: pl.DataFrame, factors: pl.DataFrame) -> pl.DataFrame:
@@ -228,18 +280,31 @@ def stored(symbol: str, start: date | None = None) -> pl.DataFrame:
     return pl.concat(frames).unique(subset=["t"], keep="last").sort("t")
 
 
-def load(symbols: list[str], start: datetime, now: datetime | None = None) -> pl.DataFrame:
-    """Update the store, then return adjusted regular-session minute bars from ``start`` on."""
+def load(symbols: list[str], start: datetime, now: datetime | None = None,
+         end: datetime | None = None) -> pl.DataFrame:
+    """Update the store, then return adjusted regular-session minute bars from ``start`` on.
+
+    ``end`` (exclusive; the loop passes the midnight after ``data.end``) pins the data once it lies in
+    the past: no bar at or after it is fetched or returned, and the adjustment factors are those of the
+    pin, cached (``pinned_factors``), so every job of an ``eval.version`` sees identical bars. Until
+    2026-11-26 the pin was applied only after loading: each job ingested up to the present and fetched
+    fresh factors, so the first dividend after the pin would have changed the data under the version."""
     creds = credentials()
     if creds is None:
         raise MissingKeysError("ALPACA_API_KEY / ALPACA_SECRET_KEY not set (environment or .env)")
     now = now or datetime.now(UTC)
-    ingest(symbols, start, now, creds)
+    pinned = end is not None and end <= now - DELAY
+    ingest(symbols, start, now, creds, end=end if pinned else None)
     frames = []
     for s in symbols:
         raw = stored(s, start.date()).filter(pl.col("t") >= start)
+        if pinned:
+            raw = raw.filter(pl.col("t") < end)
         if raw.height:
-            frames.append(adjust(raw, adjustment_factors(s, start - timedelta(days=7), now - DELAY, creds)))
+            lo = start - timedelta(days=7)
+            factors = (pinned_factors(s, lo, end, creds) if pinned
+                       else adjustment_factors(s, lo, now - DELAY, creds))
+            frames.append(adjust(raw, factors))
     if len(frames) < max(2, len(symbols) // 2):
         raise RuntimeError(f"too few symbols with alpaca minute bars ({len(frames)}/{len(symbols)})")
     return pl.concat(frames).select(COLS).sort(["symbol", "t"])

@@ -256,5 +256,5 @@ def _load_bars(cfg: dict, end: datetime | None) -> pl.DataFrame:
 
         if not cfg.get("start"):
             raise ValueError("data.start is required for the alpaca source (minute history is large)")
-        return alpaca.load(symbols, datetime.fromisoformat(str(cfg["start"])).replace(tzinfo=UTC))
+        return alpaca.load(symbols, datetime.fromisoformat(str(cfg["start"])).replace(tzinfo=UTC), end=end)
     raise ValueError(f"unknown data source {src!r}")

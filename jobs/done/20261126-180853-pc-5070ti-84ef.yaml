@@ -1,0 +1,18 @@
+tier: nano
+kind: train
+model:
+  d_model: 32
+  dropout: 0.2
+  ffn: 4
+  kernel: 25
+  lookback: 256
+  n_blocks: 3
+  patch: 4
+  stride: 2
+train: {}
+note: mutation of 20261126-x4-nano-champ-batch2048-s11
+seed: 67256
+id: 20261126-180853-pc-5070ti-84ef
+origin: worker
+worker: pc-5070ti
+attempts: 1

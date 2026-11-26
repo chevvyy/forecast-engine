@@ -331,3 +331,58 @@ def test_prune_job_uses_its_parents_shape_and_lookback(tmp_path, monkeypatch):
     assert seen == [64]                                   # the preset says 32
     assert res["model"]["lookback"] == 64 and res["model"]["d_model"] == 12
     assert res["params"] == parent["params"]
+
+
+def _minute_cfg() -> dict:
+    cfg = yaml.safe_load((ROOT / "configs" / "loop_minute.yaml").read_text())
+    cfg["data"] = {"source": "synthetic", "interval": "1m", "symbols": ["SPY", "AAA", "BBB"],
+                   "n_bars": 390 * 14, "seed": 3}
+    cfg["train"].update(max_epochs=1, batch_size=256)
+    for t in cfg["tiers"].values():
+        t["min_vram_gb"] = 0
+        t["model"].update(d_model=8, n_blocks=1, kernel=5)
+    return cfg
+
+
+def test_minute_track_runs_from_its_own_config_and_never_competes_with_daily(tmp_path):
+    from forecast.loop.run_job import load_cfg
+
+    a, _ = _setup(tmp_path)
+    ga = Git(a, "loop")
+    (a / "configs" / "loop_minute.yaml").write_text(yaml.safe_dump(_minute_cfg()))
+    q = a / "jobs" / "queued"
+    (q / "min1.yaml").write_text(yaml.safe_dump({"id": "min1", "tier": "nano", "config": "loop_minute"}))
+    (q / "bad1.yaml").write_text(yaml.safe_dump({"id": "bad1", "tier": "nano", "config": "../loop"}))
+    (q / "bad2.yaml").write_text(yaml.safe_dump({"id": "bad2", "tier": "nano", "config": "no_such_track"}))
+    assert ga.publish("minute track", ["configs", "jobs"])
+    rng = random.Random(2)
+    for _ in range(3):   # min1 (minute), q1 (daily), then a self-invented job, which must be daily
+        step("wa", ["nano"], ga, rng, repo=a, device="cpu", allow_cpu=True)
+    res = load_results(a)
+    by = {r["id"]: r for r in res}
+    assert by["min1"]["status"] == "ok", by["min1"].get("error")
+    assert by["min1"]["eval_version"] == "minute-1" and by["min1"]["config"] == "loop_minute"
+    assert by["min1"]["horizons"] == [5, 15, 30, 60]
+    daily_ver = load_cfg(a)["eval"]["version"]
+    assert by["q1"]["eval_version"] == daily_ver and by["q1"]["config"] == "loop"
+    assert all(r["eval_version"] == daily_ver for r in res if r["id"] != "min1")
+    assert champions(res, "minute-1")["nano"]["id"] == "min1"
+    assert champions(res, daily_ver)["nano"]["id"] != "min1"
+    assert "min1" not in render(res, daily_ver) and "min1" in render(res, "minute-1")
+    # Jobs naming a config that is not a plain file in configs/ are left alone, and the worker carries on.
+    assert sorted(p.stem for p in q.glob("*.yaml")) == ["bad1", "bad2"]
+
+
+def test_minute_config_is_a_separate_track_that_fits_inside_a_session():
+    daily = yaml.safe_load((ROOT / "configs" / "loop.yaml").read_text())
+    minute = yaml.safe_load((ROOT / "configs" / "loop_minute.yaml").read_text())
+    versions = [yaml.safe_load(p.read_text())["eval"]["version"] for p in (ROOT / "configs").glob("loop*.yaml")]
+    assert len(set(map(str, versions))) == len(versions)       # two tracks sharing a version would compete
+    assert isinstance(daily["eval"]["version"], int) and isinstance(minute["eval"]["version"], str)
+    task, ev = minute["task"], minute["eval"]
+    per_session = 390 - task["max_lookback"] - max(task["horizons"]) + 1
+    assert per_session >= 180                                   # forecasts for at least three hours a day
+    assert ev["embargo_bars"] >= per_session and ev["dm_lag"] >= max(task["horizons"])
+    assert ev["holdout_frac"] >= daily["eval"]["holdout_frac"]
+    assert all(t["model"]["lookback"] <= task["max_lookback"] for t in minute["tiers"].values())
+    assert set(minute["tiers"]) == set(daily["tiers"])

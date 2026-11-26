@@ -1,0 +1,66 @@
+# Minute-bar track of the loop. A job runs under this file only if it says `config: loop_minute`
+# (jobs/README.md); workers never invent minute jobs on their own. Its scores live under their own
+# eval.version, so they never compete with the daily track (configs/loop.yaml), and on their own board:
+#   python -m forecast.loop.leaderboard --config loop_minute   ->  experiments/LEADERBOARD_minute.md
+# Status 2026-11-26: run on synthetic sessions only. Nothing here has met real minute bars yet.
+branch: loop
+
+data:
+  source: alpaca           # needs ALPACA_API_KEY / ALPACA_SECRET_KEY in the worker's .env
+  interval: 1m
+  start: "2026-06-01"      # short on purpose: all minute bars are held in memory (no out-of-core path yet)
+  end: "2026-11-25"        # last session used (inclusive); move it only together with eval.version
+  benchmark: SPY
+  symbols: [SPY, QQQ, IWM, AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA]
+  universe_note: "10 liquid megacaps and index ETFs chosen by hand: survivorship bias, and nothing here says anything about less liquid names"
+
+task:
+  horizons: [5, 15, 30, 60]   # bars (minutes) ahead
+  quantiles: [0.1, 0.25, 0.5, 0.75, 0.9]
+  # A forecast needs max_lookback bars before it and max(horizons) after it inside ONE regular session
+  # (390 bars; nothing crosses the overnight gap), so each symbol-day has 390 - 120 - 60 + 1 = 211
+  # forecast times: from 11:29 to 14:59 New York. No forecast in the first two hours or the last one.
+  max_lookback: 120
+
+eval:
+  version: minute-1        # never a number: daily versions are numbers, so the two tracks cannot collide
+  holdout_frac: 0.08       # most recent slice; no loop job may ever build rows from it
+  n_folds: 3
+  val_frac: 0.08
+  # Counted in forecast times, 211 per session (see task). One full session between the last training
+  # label and the first validation row: minutes of one day share that day's volatility level, so a
+  # 5-bar embargo (the daily value) would leave train and validation rows inside the same session.
+  embargo_bars: 211
+  es_frac: 0.1
+  # Newey-West lag of the DM test, also in forecast times. Label overlap alone needs max(horizons) = 60;
+  # one session (211) also covers the within-day correlation of losses. More conservative, never less.
+  dm_lag: 211
+
+train:
+  batch_size: 512
+  max_epochs: 40
+  lr: 0.001
+  weight_decay: 0.0001
+  patience: 5
+  grad_clip: 1.0
+  distill_alpha: 0.5
+
+# Same deployment budgets as the daily track; only the window lengths differ (they must fit a session).
+tiers:
+  nano:
+    max_params: 200000
+    max_onnx_bytes: 1000000
+    max_cpu_ms: 20
+    min_vram_gb: 0
+    max_minutes: 15
+    model: {lookback: 60, patch: 4, stride: 2, d_model: 24, n_blocks: 2, kernel: 9, ffn: 2, dropout: 0.1}
+  mid:
+    max_train_vram_gb: 7
+    min_vram_gb: 2
+    max_minutes: 30
+    model: {lookback: 120, patch: 4, stride: 2, d_model: 64, n_blocks: 3, kernel: 25, ffn: 2, dropout: 0.2}
+  large:
+    max_train_vram_gb: 14
+    min_vram_gb: 6
+    max_minutes: 60
+    model: {lookback: 120, patch: 4, stride: 2, d_model: 256, n_blocks: 4, kernel: 51, ffn: 4, dropout: 0.2}

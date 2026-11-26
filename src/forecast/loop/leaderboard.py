@@ -73,9 +73,16 @@ def render(results: list[dict], eval_version: int | None = None) -> str:
 
 
 if __name__ == "__main__":
-    import yaml
+    import argparse
 
-    ver = yaml.safe_load((REPO / "configs" / "loop.yaml").read_text(encoding="utf-8"))["eval"].get("version", 1)
+    from forecast.loop.run_job import load_cfg
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--config", default="loop", help="track: loop (daily, default) or e.g. loop_minute")
+    name = ap.parse_args().config
+    ver = load_cfg(REPO, name)["eval"].get("version", 1)
     text = render(load_results(), ver)
-    (REPO / "experiments" / "LEADERBOARD.md").write_text(text, encoding="utf-8")
+    # One file per track, so minute and daily scores are never read side by side as if comparable.
+    out = "LEADERBOARD.md" if name == "loop" else f"LEADERBOARD_{name.removeprefix('loop_')}.md"
+    (REPO / "experiments" / out).write_text(text, encoding="utf-8")
     print(text)

@@ -8,6 +8,7 @@ folds, against baselines fitted on the same folds, and never sees the final hold
 from __future__ import annotations
 
 import hashlib
+import re
 import shutil
 import sys
 import time
@@ -30,8 +31,19 @@ from forecast.training.trainer import fit, predict
 from forecast.utils.common import DAY, REPO, device_info, git_sha, interval_seconds, seed_everything
 
 
-def load_cfg(repo: Path = REPO) -> dict:
-    return yaml.safe_load((repo / "configs" / "loop.yaml").read_text(encoding="utf-8"))
+def load_cfg(repo: Path = REPO, name: str = "loop") -> dict:
+    """``configs/<name>.yaml``. ``loop`` is the daily track every worker runs by default; a job picks
+    another track with ``config: <name>`` (``loop_minute``). The name comes from a job file, so it may
+    only be a plain file stem: nothing outside ``configs/`` can be named."""
+    if not re.fullmatch(r"[a-z0-9_]{1,40}", str(name)):
+        raise ValueError(f"not a config name: {name!r}")
+    return yaml.safe_load((repo / "configs" / f"{name}.yaml").read_text(encoding="utf-8"))
+
+
+def job_cfg(job: dict, repo: Path = REPO) -> dict:
+    """The config a job runs under. Tracks never compete: each config has its own ``eval.version``
+    (a test keeps them distinct), and champions, proposals and leaderboards are per version."""
+    return load_cfg(repo, job.get("config") or "loop")
 
 
 def artifact_dir(run_id: str, repo: Path = REPO) -> Path | None:
@@ -86,11 +98,11 @@ def prepare(cfg: dict, lookback: int) -> tuple[Dataset, list, str]:
 
 def run_job(job: dict, cfg: dict | None = None, repo: Path = REPO, device: str | None = None) -> dict:
     t0 = time.time()
-    cfg = cfg or load_cfg(repo)
+    cfg = cfg or job_cfg(job, repo)
     info = device_info()
     device = device or info["device"]
     res: dict = {"id": job["id"], "kind": job.get("kind", "train"), "tier": job["tier"], "job": job,
-                 "git": git_sha(repo), "gpu": info["gpu"],
+                 "config": job.get("config") or "loop", "git": git_sha(repo), "gpu": info["gpu"],
                  "eval_version": cfg["eval"].get("version", 1), "device": device, "status": "error"}
     try:
         seed_everything(int(job.get("seed", 1337)))
@@ -165,7 +177,9 @@ def run_job(job: dict, cfg: dict | None = None, repo: Path = REPO, device: str |
             raise FloatingPointError(f"non-finite loss (ret {ret_m}, vol {vol_m}): the model diverged")
         best_base = np.stack([lu[..., 0], np.where(lh[..., 1].mean() <= lu[..., 1].mean(), lh[..., 1], lu[..., 1])],
                              axis=-1)
-        hmax = max(ds.horizons)
+        # Newey-West lag in forecast timestamps: labels overlap for max(horizons) - 1 bars. A config may
+        # ask for more (minute bars: a whole session, since losses within one day move together).
+        hmax = int(cfg["eval"].get("dm_lag", max(ds.horizons)))
         dm_all = M.diebold_mariano(lm.mean((1, 2)), best_base.mean((1, 2)), tt, lag=hmax)
         dm_ret = M.diebold_mariano(lm[..., 0].mean(1), best_base[..., 0].mean(1), tt, lag=hmax)
         dm_vol = M.diebold_mariano(lm[..., 1].mean(1), best_base[..., 1].mean(1), tt, lag=hmax)

@@ -22,7 +22,7 @@ import yaml
 
 from forecast.data import alpaca
 from forecast.loop.leaderboard import champions, load_results
-from forecast.loop.run_job import artifact_dir, load_cfg, run_job
+from forecast.loop.run_job import artifact_dir, job_cfg, load_cfg, run_job
 from forecast.models.patchnet import train_vram_gb
 from forecast.utils.common import REPO, device_info, release_vram, write_json
 
@@ -201,8 +201,12 @@ def step(name: str, tiers: list[str], git: Git, rng: random.Random, repo: Path =
     job, src = None, None
     for p in sorted(q.glob("*.yaml")):
         cand = yaml.safe_load(p.read_text(encoding="utf-8"))
-        if runnable(cand, cfg, tiers, info["vram_free_gb"] if info["device"] == "cuda" else 0.0, repo):
-            job, src = cand, p
+        try:
+            cand_cfg = job_cfg(cand, repo)   # a queued job may name another track (config: loop_minute)
+        except (OSError, ValueError, AttributeError, yaml.YAMLError):
+            continue                         # no such config on this branch: leave the job for the planner
+        if runnable(cand, cand_cfg, tiers, info["vram_free_gb"] if info["device"] == "cuda" else 0.0, repo):
+            job, src, cfg = cand, p, cand_cfg
             break
     if job is None:
         usable = [t for t in tiers

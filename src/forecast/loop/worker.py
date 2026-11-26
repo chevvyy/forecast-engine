@@ -22,7 +22,7 @@ import yaml
 from forecast.data import alpaca
 from forecast.loop.leaderboard import champions, load_results
 from forecast.loop.run_job import artifact_dir, load_cfg, run_job
-from forecast.utils.common import REPO, device_info, write_json
+from forecast.utils.common import REPO, device_info, release_vram, write_json
 
 RESTART = 3
 
@@ -160,6 +160,9 @@ def step(name: str, tiers: list[str], git: Git, rng: random.Random, repo: Path =
     if not git.publish(f"loop: {name} claims {job['id']}", ["jobs"]):
         return f"lost claim race for {job['id']}"
     res = run_job(job, cfg, repo, device)
+    # Without this the allocator keeps the job's high-water mark and the next VRAM check sees a busy GPU
+    # (2026-11-26: after one 6 GB job pc-5070ti reported 1.7 GB free and ran only nano jobs for hours).
+    release_vram()
     res["worker"] = name
     res["finished"] = datetime.now(UTC).isoformat(timespec="seconds")
     write_json(repo / "results" / f"{job['id']}.json", res)

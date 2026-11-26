@@ -142,3 +142,44 @@ def test_error_pause_backs_off_only_on_repeated_failures():
     assert error_pause(0) == 0 and error_pause(1) == 0
     assert [error_pause(k) for k in (2, 3, 4, 5)] == [60, 120, 240, 480]
     assert error_pause(50) == 900
+
+
+def test_own_cached_vram_is_not_counted_as_busy(monkeypatch):
+    """pc-5070ti, 2026-11-26: after its own 6 GB job the driver reported 1.66 GB free because PyTorch
+    kept the memory cached, so the worker skipped every mid and large job from then on."""
+    import torch
+
+    from forecast.utils import common
+
+    gb = 2**30
+    assert common.usable_vram_gb(int(1.66 * gb), 13 * gb, 0) > 14
+    assert common.usable_vram_gb(4 * gb, 6 * gb, 6 * gb) == 4       # memory in live tensors stays used
+    assert common.usable_vram_gb(4 * gb, 1 * gb, 2 * gb) == 4       # never subtracts
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "mem_get_info", lambda *_: (int(1.66 * gb), int(15.92 * gb)))
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda *_: 13 * gb)
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda *_: gb // 2)
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda *_: "fake")
+    info = common.device_info()
+    assert info["device"] == "cuda" and 14 < info["vram_free_gb"] <= info["vram_total_gb"]
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda *_: 40 * gb)   # nonsense input: capped at total
+    assert common.device_info()["vram_free_gb"] == info["vram_total_gb"]
+
+
+def test_worker_releases_vram_after_every_job(tmp_path, monkeypatch):
+    from forecast.loop import worker
+
+    a, _ = _setup(tmp_path)
+    calls = []
+    monkeypatch.setattr(worker, "release_vram", lambda: calls.append(1))
+    rng = random.Random(0)
+    assert "q1 ok" in step("wa", ["nano"], Git(a, "loop"), rng, repo=a, device="cpu", allow_cpu=True)
+    (a / "jobs" / "queued" / "bad.yaml").write_text(
+        yaml.safe_dump({"id": "bad", "tier": "nano", "model": {"lookback": 9999}}))
+    _git(a, "add", "-A")
+    _git(a, "commit", "-q", "-m", "bad job")
+    _git(a, "push", "-q", "origin", "HEAD:loop")
+    assert "bad error" in step("wa", ["nano"], Git(a, "loop"), rng, repo=a, device="cpu", allow_cpu=True)
+    assert len(calls) == 2   # after a finished job and after a failed one
+    from forecast.utils.common import release_vram
+    release_vram()           # harmless without a GPU

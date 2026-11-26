@@ -22,18 +22,39 @@ def seed_everything(seed: int) -> None:
     torch.cuda.manual_seed_all(seed)
 
 
+def usable_vram_gb(free_bytes: int, reserved_bytes: int = 0, allocated_bytes: int = 0) -> float:
+    """VRAM this process could still use, in GB: what the driver reports free plus the blocks PyTorch's
+    caching allocator holds for this process but has no tensor in. The driver counts that cache as
+    used, so without adding it back a worker sees its own earlier job as "someone else is using the
+    GPU" and stops taking jobs that need more than what is left."""
+    return (free_bytes + max(reserved_bytes - allocated_bytes, 0)) / 2**30
+
+
+def release_vram() -> None:
+    """Hand this process's cached GPU memory back to the driver (call between jobs)."""
+    import gc
+
+    import torch
+
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
 def device_info() -> dict[str, Any]:
-    """Describe the compute this process can use. VRAM numbers are in GB."""
+    """Describe the compute this process can use. VRAM numbers are in GB; ``vram_free_gb`` is what
+    this process could use (see ``usable_vram_gb``), not just what the driver reports free."""
     import torch
 
     if not torch.cuda.is_available():
         return {"device": "cpu", "gpu": None, "vram_total_gb": 0.0, "vram_free_gb": 0.0}
     free, total = torch.cuda.mem_get_info(0)
+    usable = usable_vram_gb(free, torch.cuda.memory_reserved(0), torch.cuda.memory_allocated(0))
     return {
         "device": "cuda",
         "gpu": torch.cuda.get_device_name(0),
         "vram_total_gb": round(total / 2**30, 2),
-        "vram_free_gb": round(free / 2**30, 2),
+        "vram_free_gb": round(min(usable, total / 2**30), 2),
     }
 
 

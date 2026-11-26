@@ -1,0 +1,18 @@
+tier: mid
+kind: train
+model:
+  d_model: 64
+  dropout: 0.2
+  ffn: 2
+  kernel: 5
+  lookback: 256
+  n_blocks: 3
+  patch: 2
+  stride: 1
+train: {}
+note: mutation of 20261126-x5-mid-champshape-d64-s11
+seed: 462474
+id: 20261126-135541-pc-5070ti-a7c6
+origin: worker
+worker: pc-5070ti
+attempts: 1

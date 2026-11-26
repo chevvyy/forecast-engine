@@ -1,0 +1,17 @@
+tier: nano
+kind: distill
+teacher: 20261126-003324-pc-5070ti-6eb8
+model:
+  d_model: 24
+  dropout: 0.3
+  ffn: 2
+  kernel: 25
+  lookback: 64
+  n_blocks: 2
+  patch: 4
+  stride: 2
+note: distil into nano champion shape
+id: 20261126-010836-pc-5070ti-e9c2
+origin: worker
+worker: pc-5070ti
+attempts: 1

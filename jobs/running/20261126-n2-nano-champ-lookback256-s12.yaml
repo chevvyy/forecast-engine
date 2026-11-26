@@ -13,3 +13,5 @@ model:
 seed: 12
 note: second seed of n1
 origin: planner
+worker: pc-5070ti
+attempts: 1

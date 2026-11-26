@@ -12,3 +12,5 @@ model:
 seed: 11
 note: 'eval v2: the v1 mid champion shape (62,686 parameters)'
 origin: planner
+worker: pc-5070ti
+attempts: 1

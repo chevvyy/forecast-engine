@@ -6,3 +6,5 @@ seed: 12
 note: 'second seed of y8 (minute track, +0.0333): noise estimate, and the first job
   through the pinned minute load; data_hash must stay b1f8ab268f40'
 origin: planner
+worker: pc-5070ti
+attempts: 1

@@ -1,0 +1,17 @@
+tier: nano
+kind: distill
+teacher: 20261126-p3-mid-preset-s11
+model:
+  d_model: 24
+  dropout: 0.3
+  ffn: 2
+  kernel: 25
+  lookback: 128
+  n_blocks: 2
+  patch: 2
+  stride: 1
+note: distil into nano champion shape
+id: 20261126-014206-pc-5070ti-dfd5
+origin: worker
+worker: pc-5070ti
+attempts: 1

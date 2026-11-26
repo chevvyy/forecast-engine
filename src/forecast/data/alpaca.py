@@ -92,8 +92,8 @@ def _get(path: str, params: dict, creds: tuple[str, str]) -> dict:
             last = e
             if e.code in (401, 403):   # bad keys or a plan limit: retrying cannot help
                 raise RuntimeError(f"alpaca refused the request (HTTP {e.code}) for {path}") from e
-            if e.code == 422:
-                raise ValueError(f"alpaca rejected the parameters for {path} (HTTP 422)") from e
+            if e.code in (400, 404, 422):   # unknown symbol or bad parameters: the answer will not change
+                raise ValueError(f"alpaca rejected the request for {path} (HTTP {e.code})") from e
             time.sleep(min(20.0 * (attempt + 1), 65.0) if e.code == 429 else 2.0 * (attempt + 1))
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
             last = e
@@ -248,30 +248,59 @@ def load(symbols: list[str], start: datetime, now: datetime | None = None) -> pl
 DAILY_FLOOR = datetime(2016, 1, 4, tzinfo=UTC)   # Alpaca's history starts in 2016
 
 
-def daily(symbols: list[str], start: datetime, now: datetime | None = None, max_age_h: float = 20.0) -> pl.DataFrame:
+def daily(symbols: list[str], start: datetime, now: datetime | None = None, max_age_h: float = 20.0,
+          end: datetime | None = None) -> pl.DataFrame:
     """Split/dividend-adjusted daily bars, one parquet per symbol under ``<DATA_ROOT>/alpaca/1Day/``.
 
     Unlike the minute store, a stale file is refetched whole with ``adjustment=all``: daily history is a
-    few thousand rows, and one fetch keeps the whole series adjusted as of the same moment."""
+    few thousand rows, and one fetch keeps the whole series adjusted as of the same moment.
+
+    ``end`` (exclusive; the loop passes the midnight after ``data.end``) pins the data: later bars are
+    dropped, and a file written after ``end`` is complete and is never refetched, so every job sees the
+    same bars and the same folds until the pin is moved. Without it a file is refetched after
+    ``max_age_h`` and the folds drift by a bar a day.
+
+    Symbols are asked for in Alpaca's spelling (``BRK.B`` for the list's ``BRK-B``) and returned under the
+    list's name. A symbol Alpaca does not know, or has no bars for, gets a ``<symbol>.none`` marker next
+    to the parquet files and is not asked for again while a parquet written at that time would still be
+    in date; otherwise every job would spend its first seconds re-asking for the same dead symbols. A
+    network error or rate limit leaves no marker: that symbol is tried again by the next job."""
     creds = credentials()
     if creds is None:
         raise MissingKeysError("no ALPACA_API_KEY / ALPACA_SECRET_KEY in the environment or .env")
     now = now or datetime.now(UTC)
     start = max(start, DAILY_FLOOR)
+    pinned = end is not None and end <= now - DELAY
     cache = data_root() / "alpaca" / "1Day"
     cache.mkdir(parents=True, exist_ok=True)
+
+    def in_date(path: Path) -> bool:
+        if not path.exists():
+            return False
+        mtime = path.stat().st_mtime
+        return mtime >= end.timestamp() if pinned else (time.time() - mtime) < max_age_h * 3600
+
     frames, failed = [], []
     for s in symbols:
-        p = cache / f"{s}.parquet"
-        if not (p.exists() and (time.time() - p.stat().st_mtime) < max_age_h * 3600):
+        p, none = cache / f"{s}.parquet", cache / f"{s}.none"
+        if not in_date(p) and not in_date(none):
             try:
-                df = fetch_bars(s, DAILY_FLOOR, now - DELAY, creds, timeframe="1Day", adjustment="all")
+                df = fetch_bars(s.replace("-", "."), DAILY_FLOOR, now - DELAY, creds, timeframe="1Day",
+                                adjustment="all").with_columns(pl.lit(s).alias("symbol"))
                 if df.height:
                     _write(df, p)
+                else:
+                    none.touch()
+            except ValueError as e:  # Alpaca does not know the symbol
+                none.touch()
+                failed.append(f"{s}: {e}")
             except Exception as e:  # keep going with the stale copy if there is one
                 failed.append(f"{s}: {e}")
         if p.exists():
             frames.append(pl.read_parquet(p))
     if len(frames) < max(2, len(symbols) // 2):
         raise RuntimeError(f"too few symbols loaded ({len(frames)}/{len(symbols)}); errors: {failed[:3]}")
-    return pl.concat(frames).select(COLS).filter(pl.col("t") >= start).sort(["symbol", "t"])
+    out = pl.concat(frames).select(COLS).filter(pl.col("t") >= start)
+    if end is not None:
+        out = out.filter(pl.col("t") < end)
+    return out.sort(["symbol", "t"])

@@ -41,8 +41,13 @@ def render(results: list[dict], eval_version: int | None = None) -> str:
     ok = [r for r in results if r.get("status") == "ok"
           and (eval_version is None or r.get("eval_version", 1) == eval_version)]
     ch = champions(results, eval_version)
-    lines = ["# Leaderboard", "",
-             f"{len(results)} runs recorded, {len(ok)} finished, {len(results) - len(ok)} failed.",
+    failed = sum(1 for r in results if r.get("status") != "ok")
+    other = len(results) - len(ok) - failed   # finished under another eval.version: not comparable
+    head = f"{len(results)} runs recorded, {len(ok)} finished, {failed} failed."
+    if eval_version is not None:
+        head = (f"Evaluation version {eval_version}: {len(ok)} finished runs. All versions: {len(results)} runs "
+                f"recorded, {failed} failed, {other} finished under other versions (not comparable, not shown).")
+    lines = ["# Leaderboard", "", head,
              "Skill = 1 - model pinball / best-baseline pinball on purged walk-forward validation folds.",
              "Positive means better than the baseline. The final holdout is not used here.",
              "Every run in this table was selected on the same validation folds, so the best score is",

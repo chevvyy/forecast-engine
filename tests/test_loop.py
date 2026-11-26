@@ -75,6 +75,10 @@ def test_two_workers_claim_run_and_publish(tmp_path):
         assert (b / "models" / r["id"] / "fold0.pt").exists() and (b / "models" / r["id"] / "model.onnx").exists()
     assert {r["kind"] for r in res} & {"distill", "prune", "train"}
     assert "Champions" in render(res)
+    # After an eval.version bump the old runs are neither champions nor counted as failures.
+    nxt = render(res, 99)
+    assert "Evaluation version 99: 0 finished runs" in nxt and " 0 failed" in nxt and "(none yet)" in nxt
+    assert f"{len(res)} finished under other versions" in nxt and not champions(res, 99)
     assert (b / "loop" / "workers" / "wa.json").exists()
 
 

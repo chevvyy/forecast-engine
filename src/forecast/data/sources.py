@@ -14,7 +14,7 @@ import re
 import time
 import urllib.error
 import urllib.request
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -211,7 +211,25 @@ def yahoo(symbols: list[str], interval: str = "1d", max_age_h: float = 20.0) -> 
     return pl.concat(frames).select(COLS).sort(["symbol", "t"])
 
 
+def end_exclusive(cfg: dict) -> datetime | None:
+    """``data.end`` (a date, inclusive) as the UTC midnight after it, or None when the data is not pinned.
+    A daily bar is stamped with its own date (Alpaca: New York midnight, Yahoo: the session open), so
+    ``t < end_exclusive`` keeps the bar of ``data.end`` and nothing later."""
+    if not cfg.get("end"):
+        return None
+    return datetime.fromisoformat(str(cfg["end"])).replace(tzinfo=UTC, hour=0, minute=0, second=0,
+                                                           microsecond=0) + timedelta(days=1)
+
+
 def load_bars(cfg: dict) -> pl.DataFrame:
+    """Bars for ``cfg`` (the ``data`` block of a loop config). ``end`` pins the last bar for every source,
+    so new bars arriving day by day cannot move the folds under a running comparison."""
+    end = end_exclusive(cfg)
+    df = _load_bars(cfg, end)
+    return df if end is None else df.filter(pl.col("t") < end)
+
+
+def _load_bars(cfg: dict, end: datetime | None) -> pl.DataFrame:
     src = cfg.get("source", "yahoo")
     symbols = resolve_symbols(cfg)
     if src == "synthetic":
@@ -226,7 +244,7 @@ def load_bars(cfg: dict) -> pl.DataFrame:
         if interval_seconds(str(cfg.get("interval", "1d"))) != 86400:
             raise ValueError("data.source auto is for daily bars; use alpaca for minute bars")
         if alpaca.available():
-            return alpaca.daily(symbols, start or alpaca.DAILY_FLOOR)
+            return alpaca.daily(symbols, start or alpaca.DAILY_FLOOR, end=end)
         src = "yahoo"
     if src == "yahoo":
         df = yahoo(symbols, cfg.get("interval", "1d"))

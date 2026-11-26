@@ -222,3 +222,54 @@ def test_auto_without_keys_uses_yahoo(monkeypatch, tmp_path):
     seen = []
     monkeypatch.setattr(sources, "yahoo", lambda syms, interval: seen.append(interval) or sources.synthetic(syms, 80))
     assert sources.load_bars({"source": "auto", "symbols": ["SPY", "AAA"]}).height == 160 and seen == ["1d"]
+
+
+def test_pinned_end_freezes_daily_bars_and_dead_symbols_are_asked_once(api, monkeypatch):
+    """Wide universe (2026-11-26): with ``data.end`` every job must see the same bars however old the
+    cache is, share classes go out in Alpaca's spelling, and a symbol Alpaca does not know costs one
+    request in total, not a retry loop in every job."""
+    from forecast.data.sources import load_bars
+
+    monkeypatch.setenv("ALPACA_API_KEY", CREDS[0])
+    monkeypatch.setenv("ALPACA_SECRET_KEY", CREDS[1])
+    cfg = {"source": "auto", "interval": "1d", "symbols": ["AAA", "BRK-B", "GONE", "VOID"],
+           "start": "2016-01-04", "end": "2024-03-01"}
+    real = alpaca.urllib.request.urlopen
+
+    def urlopen(req, timeout=0):
+        if "/GONE/" in req.full_url:
+            api.requests.append(("GONE", {}))
+            raise urllib.error.HTTPError(req.full_url, 404, "no such symbol", {}, io.BytesIO(b""))
+        if "/VOID/" in req.full_url:
+            api.requests.append(("VOID", {}))
+            return io.BytesIO(json.dumps({"bars": None, "next_page_token": None}).encode())
+        return real(req, timeout)
+
+    monkeypatch.setattr(alpaca.urllib.request, "urlopen", urlopen)
+    df = load_bars(cfg)
+    asked = [s for s, _ in api.requests]
+    assert list(dict.fromkeys(asked)) == ["AAA", "BRK.B", "GONE", "VOID"]
+    assert asked.count("GONE") == 1 and asked.count("VOID") == 1 and max(api.sleeps, default=0) < 1
+    assert set(df["symbol"].unique()) == {"AAA", "BRK-B"}
+    assert df["t"].max() == datetime(2024, 3, 1, 5, tzinfo=UTC)          # the bar of data.end, none later
+    assert (api.root.parent / "1Day" / "GONE.none").exists()
+    # Three weeks later, cache long past max_age_h: nothing is fetched and the bars are identical.
+    wall = alpaca.time.time()
+    monkeypatch.setattr(alpaca.time, "time", lambda: wall + 21 * 86400)
+    n = len(api.requests)
+    assert load_bars(cfg).equals(df) and len(api.requests) == n
+    assert (api.root.parent / "1Day" / "VOID.none").exists()
+    # A pin that is still in the future cannot freeze anything: the age rule applies, so it refetches.
+    alpaca.daily(["AAA", "BRK-B"], START, end=datetime(2999, 1, 1, tzinfo=UTC))
+    assert len(api.requests) > n
+
+
+def test_end_pin_applies_to_every_source():
+    from forecast.data.sources import end_exclusive, load_bars
+
+    cfg = {"source": "synthetic", "symbols": ["SPY", "AAA"], "n_bars": 400}
+    full = load_bars(cfg)
+    cut = load_bars({**cfg, "end": "2015-06-30"})
+    assert end_exclusive({"end": "2015-06-30"}) == datetime(2015, 7, 1, tzinfo=UTC)
+    assert cut["t"].max() == datetime(2015, 6, 30, tzinfo=UTC) and cut.height < full.height
+    assert cut.equals(full.filter(pl.col("t") < datetime(2015, 7, 1, tzinfo=UTC)))

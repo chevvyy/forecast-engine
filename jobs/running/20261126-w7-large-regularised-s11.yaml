@@ -14,3 +14,5 @@ train:
 seed: 11
 note: v1's least bad plain large shape (-0.005); the large preset overfitted 63k rows
 origin: planner
+worker: pc-5070ti
+attempts: 1

@@ -1,0 +1,8 @@
+id: 20261126-y8-minute-nano-first-real-bars
+tier: nano
+kind: train
+config: loop_minute
+seed: 11
+note: 'first job on real Alpaca minute bars (configs/loop_minute.yaml: 10 symbols
+  from 2026-06-01). A failure here is information, not a blocker.'
+origin: planner

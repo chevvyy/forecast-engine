@@ -1,0 +1,19 @@
+id: 20261126-y3-nano-batch2048-lr0003-s11
+tier: nano
+kind: train
+model:
+  lookback: 256
+  patch: 4
+  stride: 2
+  d_model: 32
+  n_blocks: 3
+  kernel: 25
+  ffn: 2
+  dropout: 0.2
+train:
+  batch_size: 2048
+  lr: 0.0003
+seed: 11
+note: 'both slow-downs together: x3 (lr 0.0003) and x4 (batch 2048) each gained about
+  +0.008 but every fold still stopped at its first epoch'
+origin: planner

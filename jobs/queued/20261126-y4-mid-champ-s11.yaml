@@ -1,0 +1,16 @@
+id: 20261126-y4-mid-champ-s11
+tier: mid
+kind: train
+model:
+  lookback: 256
+  patch: 2
+  stride: 1
+  d_model: 64
+  n_blocks: 3
+  kernel: 5
+  ffn: 2
+  dropout: 0.2
+seed: 11
+note: seed re-run of the mid champion 20261126-135541-pc-5070ti-a7c6 (+0.0174; one
+  other seed gave +0.0117)
+origin: planner

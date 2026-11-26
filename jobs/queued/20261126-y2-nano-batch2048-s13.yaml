@@ -1,0 +1,17 @@
+id: 20261126-y2-nano-batch2048-s13
+tier: nano
+kind: train
+model:
+  lookback: 256
+  patch: 4
+  stride: 2
+  d_model: 32
+  n_blocks: 3
+  kernel: 25
+  ffn: 2
+  dropout: 0.2
+train:
+  batch_size: 2048
+seed: 13
+note: second seed re-run of 20261126-x4-nano-champ-batch2048-s11
+origin: planner

@@ -1,0 +1,11 @@
+id: 20261126-y7-prune-nano-3409-70
+tier: nano
+kind: prune
+init_from: 20261126-104135-pc-5070ti-3409
+sparsity: 0.7
+train:
+  lr: 0.0003
+  max_epochs: 15
+seed: 11
+note: 're-queue of x7: same fault as x6'
+origin: planner

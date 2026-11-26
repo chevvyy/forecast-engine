@@ -34,6 +34,8 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
 3. **Leaderboard.** `python -m forecast.loop.leaderboard`, commit `experiments/LEADERBOARD.md`, and add
    one row per cycle to `experiments/LOG.md` (date, runs since last cycle, champion per tier with score,
    what was learned). Include the total number of configurations tried so far.
+   Once the minute track has results: `python -m forecast.loop.leaderboard --config loop_minute` too
+   (`experiments/LEADERBOARD_minute.md`). Minute and daily scores are never compared with each other.
 4. **Decide the next experiments** from the results, and write 3-8 job files into `jobs/queued/`:
    - re-run each new champion with 2 more seeds before trusting it (noise estimate);
    - distil the large champion into mid, and mid into nano;
@@ -43,11 +45,21 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
 5. **Improve the code: the top unfinished backlog item**, with tests. Workers restart themselves when
    `src/` or `pyproject.toml` changes, so a broken push stops all training: run the full test suite and
    a CPU dry run (`data.source: synthetic`) of any changed job path before pushing.
-6. **Housekeeping.** Remove `models/<id>/` folders that are no longer champion or runner-up of a tier.
+6. **Housekeeping.** Remove `models/<id>/` folders that are no longer champion or runner-up of a tier
+   and are not the `teacher` / `init_from` of a job still in `jobs/queued/`.
    Keep `jobs/done/` and `results/` (they are the experiment record).
 7. **Push** to `loop`. If the push is rejected, `git pull --rebase` and retry; never force-push.
 8. **Tell Dev only when it matters:** a worker down > 6 h, the loop blocked on something only he can
    do, or a tier's champion beating the baseline for the first time (or by a new clear margin).
+
+## Prune results before 2026-11-26 09:20 (do not use)
+A prune job (`init_from`) built its windows at the tier preset's lookback, not its parent's, and recorded
+the preset shape. Where the parent's lookback is longer than the preset's, the parent was finetuned and
+scored on windows shorter than it was trained on: version 2 nano runs x6, x7 and a353 (parent lookback
+256, windows 64), and any version-1 prune of a champion with a longer lookback than its preset. Large
+prunes (preset 256, parents 128) were computed correctly; only their recorded `model` is the preset.
+The result files are left as they are (results are not hand-edited); none of them is a champion.
+Fixed in `run_job` with `test_prune_job_uses_its_parents_shape_and_lookback`; x6 / x7 re-queued as y6 / y7.
 
 ## Data source note (2026-11-25)
 Yahoo answered HTTP 429 to the first request from pc-5070ti: it refuses scripted clients. Do not add
@@ -131,18 +143,36 @@ together with an `eval.version` bump (new bars move the holdout and every fold).
       intraday returns. Costs of the rule: no forecast in the first `max_lookback` - 1 bars of a session
       or its last `max(horizons)` bars, and a symbol with scattered missing minutes loses many rows.
       Only ever run on synthetic sessions; no real intraday bars have gone through it yet.
-      (b2) [ ] `configs/loop_minute.yaml` (horizons 5/15/30/60 bars at 1 minute; `max_lookback` plus the
-      longest horizon must fit well inside a 390-bar session) selected per job or per worker, with its
-      own leaderboard so minute and daily scores never compete, and intraday evaluation that also reports
-      results net of a per-trade cost assumption (docs/EVALUATION.md). The DM lag and `embargo_bars`
-      need re-deriving for minute bars. Start with a short symbol list; hundreds of symbols times years
-      of minutes needs an out-of-core window path first. Can be tried on Yahoo `1h`/`5m` (keyless
-      stopgaps: ~730 and ~60 days; note Yahoo `5m` needs `range=60d`, the fetcher asks for 730d; at `1h`
-      a session is 7 bars, so only lookback + horizon <= 7 fits). A time-of-day input belongs with the
-      "richer causal features" item.
-      (c) [ ] switch workers that have keys onto minute jobs. Needs Dev: create Alpaca paper keys and put
-      `ALPACA_API_KEY` and `ALPACA_SECRET_KEY` in that worker's `.env` (log under "Needs Dev" until a
-      heartbeat shows `alpaca_keys: true`).
+      (b2a) [x] minute track (done 2026-11-26 09:20): a queued job with `config: loop_minute` runs under
+      `configs/loop_minute.yaml` (`run_job.job_cfg`; the name must be a plain file stem in `configs/`).
+      10 hand-picked liquid symbols from 2026-06-01, pinned to 2026-11-25; horizons 5/15/30/60 bars;
+      `max_lookback` 120, so each symbol-day has 390 - 120 - 60 + 1 = 211 forecast times (11:29 to
+      14:59 New York). Re-derived for minute bars: `embargo_bars` 211 (one session of forecast times
+      between the last training label and the first validation row, because minutes of one day share
+      that day's volatility level) and the new `eval.dm_lag` 211 (label overlap needs 60; a session also
+      covers within-day correlation of losses). Its `eval.version` is the string `minute-1`; champions,
+      worker proposals and leaderboards are all per version, so the tracks cannot compete, and
+      `tests/test_loop.py` keeps the versions distinct. Workers never invent minute jobs. Own board:
+      `leaderboard --config loop_minute` -> `experiments/LEADERBOARD_minute.md`.
+      Only ever run on synthetic sessions. Job y8 is the first on real Alpaca minute bars.
+      **Next cycle must check on the real machine:** y8's `status` (the ingestor has never talked to the
+      real API; an error there is the expected kind of finding), `symbols` = 10, rows per fold against
+      10 x sessions x 211, one `data_hash` across minute runs, and whether the baselines (unconditional,
+      HAR on 20-bar realised volatility) are sensible at one minute before reading any skill number.
+      (b2b) [ ] still open, in this order: (1) `alpaca.load` ignores the pin while fetching (it ingests up
+      to now and `load_bars` cuts afterwards; harmless, but adjustment factors are refetched every job,
+      so a dividend after the pin changes `data_hash`: pass `end` down and cache the factors);
+      (2) a time-of-day input and an intraday volatility baseline that knows the U-shape of the session
+      (without it the model may "beat" HAR only by learning the clock); (3) exchange calendar for
+      half-days; (4) out-of-core windows before the symbol list grows; (5) results net of a per-trade
+      cost (docs/EVALUATION.md section 4). That last one needs a backtest of a simple rule, which the
+      loop's standing rules exclude (no trading code), so it waits for Dev to say what he wants there.
+      Can also be tried on Yahoo `1h`/`5m` (keyless stopgaps: ~730 and ~60 days; note Yahoo `5m` needs
+      `range=60d`, the fetcher asks for 730d; at `1h` a session is 7 bars, so only lookback + horizon
+      <= 7 fits).
+      (c) [ ] switch workers that have keys onto minute jobs: pc-5070ti reports `alpaca_keys: true`
+      (since 2026-11-25), so nothing is needed from Dev. Do it only after y8 has run cleanly and (b2b)
+      items 1 and 2 are in; until then the planner queues minute jobs by hand, a few per cycle.
 - [ ] Seed-noise estimate per tier; promotion must beat the champion by more than that noise.
       First number (2026-11-25 21:15): the nano champion's configuration over 15 seeds scores mean
       +0.022, sd 0.005, range +0.014..+0.031. The leaderboard champion is the best of those seeds, so
@@ -152,6 +182,13 @@ together with an `eval.version` bump (new bars move the holdout and every fold).
       Same function, found 2026-11-26: a mutation starts from the champion's model shape but not from
       its training settings (`lr`, `weight_decay`, `batch_size` fall back to the defaults unless they
       are the mutated keys), so the search cannot hill-climb on those. Inherit `job.train` of the champion.
+      This now costs something (2026-11-26 09:20): the nano champion is the old shape at batch 2048, and
+      every mutation of it goes back to batch 512.
+      Early stopping is too coarse for the wide universe (same date): with about 1800 steps per epoch,
+      every fold of 13 of the 29 version-2 training runs kept its FIRST epoch (`epochs` 6 = 1 + patience),
+      also at lr 0.0003 and at batch 2048, both of which scored better. The best point is probably inside
+      the first epoch. Evaluate the early-stopping slice every N steps (or a fraction of an epoch) and
+      record the best step in `folds`. This changes training, not the evaluation: no version bump.
 - [ ] LightGBM quantile baseline on tabular features (the scaffold's "first real model"); deep models
       must be compared against it in every result. Bumps `eval.version`.
       Same version bump: a fairer return baseline. Returns are scaled by rv20 and the return baseline

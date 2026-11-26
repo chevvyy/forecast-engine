@@ -1,0 +1,15 @@
+id: 20261126-y5-mid-champ-s12
+tier: mid
+kind: train
+model:
+  lookback: 256
+  patch: 2
+  stride: 1
+  d_model: 64
+  n_blocks: 3
+  kernel: 5
+  ffn: 2
+  dropout: 0.2
+seed: 12
+note: second seed re-run of 20261126-135541-pc-5070ti-a7c6
+origin: planner

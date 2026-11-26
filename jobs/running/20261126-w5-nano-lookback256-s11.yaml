@@ -13,3 +13,5 @@ seed: 11
 note: 'v1 hint: lookback 256 scored +0.027 (2 seeds) against +0.022 (16 seeds) at
   128; not settled'
 origin: planner
+worker: pc-5070ti
+attempts: 1

@@ -47,6 +47,9 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
    a CPU dry run (`data.source: synthetic`) of any changed job path before pushing.
 6. **Housekeeping.** Remove `models/<id>/` folders that are no longer champion or runner-up of a tier
    and are not the `teacher` / `init_from` of a job still in `jobs/queued/`.
+   Champion and runner-up are per track and version (daily, minute, and the closed version 1). Also keep
+   the first run of a configuration the log calls confirmed across seeds, while it is the confirmed
+   one for its tier (mid: `20261126-135541-pc-5070ti-a7c6`).
    Keep `jobs/done/` and `results/` (they are the experiment record).
 7. **Push** to `loop`. If the push is rejected, `git pull --rebase` and retry; never force-push.
 8. **Tell Dev only when it matters:** a worker down > 6 h, the loop blocked on something only he can
@@ -159,9 +162,23 @@ together with an `eval.version` bump (new bars move the holdout and every fold).
       real API; an error there is the expected kind of finding), `symbols` = 10, rows per fold against
       10 x sessions x 211, one `data_hash` across minute runs, and whether the baselines (unconditional,
       HAR on 20-bar realised volatility) are sensible at one minute before reading any skill number.
-      (b2b) [ ] still open, in this order: (1) `alpaca.load` ignores the pin while fetching (it ingests up
-      to now and `load_bars` cuts afterwards; harmless, but adjustment factors are refetched every job,
-      so a dividend after the pin changes `data_hash`: pass `end` down and cache the factors);
+      **Checked 2026-11-26 13:10 on the real machine:** y8 ran cleanly on its first contact with the real
+      API (2 minutes). 10 symbols; 162,930 / 180,400 / 198,340 training rows and 19,410 validation rows
+      per fold (9.2 sessions x 10 x 211; a whole number of sessions is not expected, a missing minute
+      costs rows); HAR beats the unconditional volatility baseline by 9.5% (0.0919 against 0.1015), so
+      the baselines behave; 80% coverage 0.78-0.80; training ran 9-10 epochs per fold. Score +0.0333
+      (vol +0.062, return +0.005, rank IC 0.000), one seed: read it only after item (2) below, because
+      forecasts sit between 11:29 and 14:59 and HAR does not know the time of day.
+      (b2b) [ ] still open, in this order: (1) [x] the pin inside the fetch (done 2026-11-26 13:10):
+      `alpaca.load(..., end=)` asks for no bar at or after the pin, skips ranges with no session minute,
+      and marks the open month as asked up to the pin (`YYYY-MM.through`), so a pinned job makes no bar
+      request after the first; adjustment factors are normalised to the last day before the pin and
+      cached per symbol and pin under `alpaca/factors/` (`pinned_factors`), so a split or dividend after
+      the pin cannot change the bars, on a machine that already has them or on one that fetches them
+      later (`test_pinned_minute_load_fetches_nothing_past_the_pin_and_freezes_the_adjustment`). Same
+      bars as before as long as nothing went ex-dividend on 2026-11-26 or since: **next cycle must check
+      that z8 reports `data_hash` b1f8ab268f40**; if it differs, y8 and z8 are not comparable, say so in
+      the log and re-run y8's seed;
       (2) a time-of-day input and an intraday volatility baseline that knows the U-shape of the session
       (without it the model may "beat" HAR only by learning the clock); (3) exchange calendar for
       half-days; (4) out-of-core windows before the symbol list grows; (5) results net of a per-trade
@@ -179,6 +196,10 @@ together with an `eval.version` bump (new bars move the holdout and every fold).
       its own score overstates the configuration by about 0.009. Not yet in code: the leaderboard
       should rank configurations by their seed mean, and `propose` should re-run a would-be champion.
       On version 2 the noise looks larger: two seeds of one nano shape scored +0.009 and -0.007.
+      Version 2 numbers (2026-11-26 13:10): sd across seeds of one configuration is 0.003-0.004 in nano
+      and mid where a shape has 3-4 seeds (nano batch 2048: +0.044, +0.038, +0.037; mid a7c6 shape:
+      +0.017, +0.012, +0.018, +0.019). The
+      board still ranks single runs: the mid and large "champions" (066b, 01c4) are one seed each.
       Same function, found 2026-11-26: a mutation starts from the champion's model shape but not from
       its training settings (`lr`, `weight_decay`, `batch_size` fall back to the defaults unless they
       are the mutated keys), so the search cannot hill-climb on those. Inherit `job.train` of the champion.

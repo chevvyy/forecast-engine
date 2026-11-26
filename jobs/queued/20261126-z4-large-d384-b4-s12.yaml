@@ -1,0 +1,16 @@
+id: 20261126-z4-large-d384-b4-s12
+tier: large
+kind: train
+model:
+  lookback: 256
+  patch: 8
+  stride: 4
+  d_model: 384
+  n_blocks: 4
+  kernel: 15
+  ffn: 2
+  dropout: 0.3
+seed: 12
+note: seed re-run of the new large champion 20261126-190159-pc-5070ti-01c4 (+0.0144,
+  one seed)
+origin: planner

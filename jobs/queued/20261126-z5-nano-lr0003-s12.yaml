@@ -1,0 +1,18 @@
+id: 20261126-z5-nano-lr0003-s12
+tier: nano
+kind: train
+model:
+  lookback: 256
+  patch: 4
+  stride: 2
+  d_model: 32
+  n_blocks: 3
+  kernel: 25
+  ffn: 2
+  dropout: 0.2
+train:
+  lr: 0.0003
+seed: 12
+note: second seed of lr 0.0003 at batch 512 (x3 scored +0.0435 with seed 11); compare
+  with batch 2048 (3 seeds, mean +0.039)
+origin: planner

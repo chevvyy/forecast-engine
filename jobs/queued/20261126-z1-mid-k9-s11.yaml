@@ -1,0 +1,16 @@
+id: 20261126-z1-mid-k9-s11
+tier: mid
+kind: train
+model:
+  lookback: 256
+  patch: 4
+  stride: 2
+  d_model: 64
+  n_blocks: 3
+  kernel: 9
+  ffn: 2
+  dropout: 0.2
+seed: 11
+note: seed re-run of the new mid champion 20261126-192624-pc-5070ti-066b (+0.0221,
+  one seed)
+origin: planner

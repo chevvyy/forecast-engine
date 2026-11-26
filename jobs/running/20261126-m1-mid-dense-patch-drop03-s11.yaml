@@ -9,3 +9,5 @@ seed: 11
 note: mid preset with the two settings that mattered on nano (patch 2/stride 1, dropout
   0.3). Mid has only 2 runs so far.
 origin: planner
+worker: pc-5070ti
+attempts: 1

@@ -1,0 +1,134 @@
+{
+  "config": "loop",
+  "coverage_80": [
+    [
+      0.7966,
+      0.8017
+    ],
+    [
+      0.7819,
+      0.7749
+    ],
+    [
+      0.7746,
+      0.7736
+    ]
+  ],
+  "cpu_ms_per_forecast": 0.327,
+  "data_hash": "500294764fb3",
+  "device": "cuda",
+  "dm": {
+    "all": [
+      -1.0539854829390294,
+      0.2918895635838225
+    ],
+    "ret": [
+      0.8701545911474364,
+      0.3842159275484725
+    ],
+    "vol": [
+      -3.393265769782315,
+      0.0006906459525401296
+    ]
+  },
+  "eval_version": 2,
+  "finished": "2026-11-26T16:57:59+00:00",
+  "fits_tier": true,
+  "folds": [
+    {
+      "epochs": 6,
+      "es_pinball": 0.23467327654361725,
+      "n_train": 753990,
+      "n_val": 93975,
+      "peak_vram_gb": 1.855
+    },
+    {
+      "epochs": 6,
+      "es_pinball": 0.24560943245887756,
+      "n_train": 838233,
+      "n_val": 94394,
+      "peak_vram_gb": 1.857
+    },
+    {
+      "epochs": 6,
+      "es_pinball": 0.2479245960712433,
+      "n_train": 922663,
+      "n_val": 95360,
+      "peak_vram_gb": 1.861
+    }
+  ],
+  "git": "8ab479c9",
+  "gpu": "NVIDIA GeForce RTX 5070 Ti",
+  "horizons": [
+    1,
+    5,
+    20
+  ],
+  "id": "20261126-y4-mid-champ-s11",
+  "job": {
+    "attempts": 1,
+    "id": "20261126-y4-mid-champ-s11",
+    "kind": "train",
+    "model": {
+      "d_model": 64,
+      "dropout": 0.2,
+      "ffn": 2,
+      "kernel": 5,
+      "lookback": 256,
+      "n_blocks": 3,
+      "patch": 2,
+      "stride": 1
+    },
+    "note": "seed re-run of the mid champion 20261126-135541-pc-5070ti-a7c6 (+0.0174; one other seed gave +0.0117)",
+    "origin": "planner",
+    "seed": 11,
+    "tier": "mid",
+    "worker": "pc-5070ti"
+  },
+  "kind": "train",
+  "minutes": 4.42,
+  "model": {
+    "d_model": 64,
+    "dropout": 0.2,
+    "ffn": 2,
+    "kernel": 5,
+    "lookback": 256,
+    "n_blocks": 3,
+    "patch": 2,
+    "stride": 1
+  },
+  "nonzero_params": 58846,
+  "onnx_bytes": 251901,
+  "onnx_max_abs_diff": 2.384185791015625e-07,
+  "params": 58846,
+  "peak_vram_gb": 1.861,
+  "pinball": {
+    "ret_baseline": 0.3055918514728546,
+    "ret_model": 0.30846428871154785,
+    "vol_baseline": 0.19298601150512695,
+    "vol_har": 0.19298601150512695,
+    "vol_model": 0.18408064544200897,
+    "vol_unconditional": 0.20153072476387024
+  },
+  "rank_ic_h1": 0.0016102013453760129,
+  "score": 0.018372803926467896,
+  "skill_ret": -0.00939953327178955,
+  "skill_vol": 0.04614514112472534,
+  "status": "ok",
+  "symbols": 539,
+  "tier": "mid",
+  "train": {
+    "batch_size": 512,
+    "distill_alpha": 0.5,
+    "grad_clip": 1.0,
+    "lr": 0.001,
+    "max_epochs": 40,
+    "patience": 5,
+    "weight_decay": 0.0001
+  },
+  "universe": {
+    "note": "current index members and megacaps: survivorship bias, return skill is optimistic",
+    "requested": 539
+  },
+  "worker": "pc-5070ti"
+}

@@ -1,0 +1,15 @@
+id: 20261126-w5-nano-lookback256-s11
+tier: nano
+kind: train
+model:
+  d_model: 32
+  n_blocks: 3
+  kernel: 25
+  lookback: 256
+  patch: 2
+  stride: 1
+  dropout: 0.3
+seed: 11
+note: 'v1 hint: lookback 256 scored +0.027 (2 seeds) against +0.022 (16 seeds) at
+  128; not settled'
+origin: planner

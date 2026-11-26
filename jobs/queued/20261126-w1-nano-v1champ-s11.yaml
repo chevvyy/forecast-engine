@@ -1,0 +1,15 @@
+id: 20261126-w1-nano-v1champ-s11
+tier: nano
+kind: train
+model:
+  d_model: 32
+  n_blocks: 3
+  kernel: 25
+  lookback: 128
+  patch: 2
+  stride: 1
+  dropout: 0.3
+seed: 11
+note: 'eval v2 (539 symbols): the v1 nano champion shape. Does its volatility skill
+  over HAR carry over to symbols it was not selected on?'
+origin: planner

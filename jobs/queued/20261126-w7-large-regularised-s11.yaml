@@ -1,0 +1,16 @@
+id: 20261126-w7-large-regularised-s11
+tier: large
+kind: train
+model:
+  d_model: 256
+  n_blocks: 4
+  lookback: 128
+  patch: 4
+  stride: 2
+  dropout: 0.3
+train:
+  lr: 0.0003
+  weight_decay: 0.01
+seed: 11
+note: v1's least bad plain large shape (-0.005); the large preset overfitted 63k rows
+origin: planner

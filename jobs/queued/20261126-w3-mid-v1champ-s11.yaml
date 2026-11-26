@@ -1,0 +1,14 @@
+id: 20261126-w3-mid-v1champ-s11
+tier: mid
+kind: train
+model:
+  d_model: 64
+  n_blocks: 3
+  kernel: 25
+  lookback: 128
+  patch: 2
+  stride: 1
+  dropout: 0.3
+seed: 11
+note: 'eval v2: the v1 mid champion shape (62,686 parameters)'
+origin: planner

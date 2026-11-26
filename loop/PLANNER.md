@@ -26,6 +26,9 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
    - `results/*.json` with `status: error`: read `error`/`traceback`, fix the cause in code (with a test),
      and re-queue the job if it was a queued one. If every recent result fails the same way, fixing
      that is the whole cycle.
+   - Same data everywhere: every `ok` result of the current `eval.version` should carry one `data_hash`
+     and one `symbols` count. If they differ (a symbol failed to download on one machine or one day),
+     say so in the log and do not compare those runs with each other.
    - `jobs/running/*.yaml` whose worker has pushed newer results, or older than 3 h: move back to
      `queued/` (delete worker-invented ones, `origin: worker`).
 3. **Leaderboard.** `python -m forecast.loop.leaderboard`, commit `experiments/LEADERBOARD.md`, and add
@@ -54,6 +57,14 @@ worker without keys (Yahoo) and one with keys (Alpaca) differ slightly in data; 
 report, record the source in results and keep them on separate leaderboards. The wide-universe list
 still applies; with Alpaca, 539 symbols is about 4 minutes of requests at the free plan's rate.
 
+## Data pin and evaluation versions (2026-11-26)
+`data.end` in `configs/loop.yaml` is the last bar any job may load. With it, cached daily files are never
+refetched and every job of an `eval.version` sees the same bars and folds. Move `data.end` forward only
+together with an `eval.version` bump (new bars move the holdout and every fold). Version history:
+1 = 35 symbols, closed 2026-11-26, final board in `experiments/LEADERBOARD_v1.md`;
+2 = 539-symbol list (`configs/data/universe_wide.txt`), data to 2026-11-25.
+`experiments/LEADERBOARD.md` shows the current version only.
+
 ## Backlog (ordered; tick items off here as they land)
 - [x] First real-data triage (done 2026-11-25 21:15): `ok` runs from pc-5070ti on Alpaca daily bars since
       2026-11-26 00:22 UTC. Two breakages found and fixed: missing `tzdata` on Windows (1064 failed
@@ -62,7 +73,7 @@ still applies; with Alpaca, 539 symbols is about 4 minutes of requests at the fr
       Paths and data gaps: nothing seen (all 35 symbols usable, identical folds in every run).
       Next cycle must confirm the VRAM fix on the real machine: `vram_free_gb` in the heartbeat back
       near 14, and mid/large results arriving again. If not, something else is using that GPU.
-- [ ] **Wide universe (Dev asked for as many tickers as possible, 2026-11-25).** Three parts, in order:
+- [x] **Wide universe (Dev asked for as many tickers as possible, 2026-11-25).** Three parts, in order:
       (a) [x] lazy window loading (done 2026-11-25: `features.build.Windows`; `tests/test_windows.py`
       asserts equality with the old eager builder; 520 synthetic symbols x 5400 bars at lookback 256 build
       in ~0.5 GB instead of 15 GB). (b) [x] committed symbol list and polite download (done
@@ -71,12 +82,31 @@ still applies; with Alpaca, 539 symbols is about 4 minutes of requests at the fr
       `sources.resolve_symbols`; Yahoo 404 skips the symbol at once, 429 backs off 15 s -> 120 s and
       honours Retry-After, and after repeated 429s the rest of the call uses the parquet cache; every
       result now carries `universe.requested` and the survivorship note; `tests/test_data_sources.py`).
-      (c) [ ] switch the loop to it: uncomment `data.symbols_file` in `configs/loop.yaml` and bump
-      `eval.version` in the same commit. Do this only after `results/` shows `ok` real-data runs on the
-      35-symbol universe (item 1), so the first triage is not confounded by a 15x larger download and
-      dataset. When switching, check the tier time budgets: the first download is roughly 539 requests
-      (several minutes) and an epoch is about 15x longer, so `max_minutes` may need raising, and the
-      list should be re-verified against a second full source (281 of the 503 S&P rows rest on one).
+      (c) [x] switched (done 2026-11-26 01:10 cycle): `data.symbols_file` on, `eval.version` 2, `data.end`
+      pinned to 2026-11-25, tier budgets raised to 15/30/60 minutes (about 18x more rows per epoch; a
+      job that hits its budget stops early and reports fewer `epochs`). Alpaca requests use its spelling
+      (`BRK.B`), and a symbol it does not know is marked and not asked for again. Only ever run on
+      synthetic data so far. **Next cycle must check on the real machine:** `symbols` in the first
+      results (expect a little under 539), one `data_hash` throughout, `minutes` and `epochs` against
+      the budgets, and that no score is NaN. If every job fails, revert `configs/loop.yaml` to the
+      35-symbol universe (and bump `eval.version` again) rather than leaving the GPU idle.
+      Still open: the list was not re-verified against a second full source (281 of the 503 S&P rows
+      rest on one; Wikipedia could not be fetched from the planner on 2026-11-26 either), and what
+      Alpaca really answers for an unknown symbol is assumed (400/404/422 or an empty page), not seen.
+- [ ] **Worker-invented distil and prune jobs carry no seed and are never checked against earlier runs**
+      (found 2026-11-25 21:15): 142 distil runs were 11 distinct jobs and 84 prune runs were 23, each
+      repeat giving the identical score. Give them a random seed and skip a proposal whose
+      (tier, kind, model, train, seed, teacher/parent, sparsity) already has a result. Same change:
+      nano jobs take ~15 s and each makes two commits (about 7 commits a minute, 3000+ in four hours),
+      so let the worker commit claim and result together for self-invented jobs, or space them out.
+      Moved to the top on 2026-11-26: on the wide universe each exact duplicate costs minutes, not
+      seconds. Until it lands, `search.p_distill` / `p_prune` are lowered to 0.1 / 0.05 (were 0.25 / 0.15).
+      Same change, same function (`worker.propose`): do not propose a shape whose training cannot fit
+      the tier's VRAM. Inference no longer causes it (`trainer.predict_batch`, 2026-11-26), but at batch
+      512 a 255-token, 8-block model needs roughly 10 GB at d_model 384 and about 14 GB at 512 (v1
+      measurements), so `patch: [2, 1]` with lookback 256 and d_model >= 512 still cannot train on 16 GB.
+      And treat a non-finite score as a failed run (a NaN first run would become a tier's champion
+      and never be replaced, since nothing compares greater than NaN).
 - [ ] **Minute bars (Dev asked, for short-horizon forecasts).** Three parts, in order:
       (a) [x] Alpaca ingestor (done 2026-11-25: `forecast.data.alpaca`, `data.source: alpaca`;
       resumable per-symbol-month parquet, `feed=sip`, nothing newer than 16 minutes, ~170 requests/min,
@@ -109,12 +139,6 @@ still applies; with Alpaca, 539 symbols is about 4 minutes of requests at the fr
       (c) [ ] switch workers that have keys onto minute jobs. Needs Dev: create Alpaca paper keys and put
       `ALPACA_API_KEY` and `ALPACA_SECRET_KEY` in that worker's `.env` (log under "Needs Dev" until a
       heartbeat shows `alpaca_keys: true`).
-- [ ] **Worker-invented distil and prune jobs carry no seed and are never checked against earlier runs**
-      (found 2026-11-25 21:15): 142 distil runs were 11 distinct jobs and 84 prune runs were 23, each
-      repeat giving the identical score. Give them a random seed and skip a proposal whose
-      (tier, kind, model, train, seed, teacher/parent, sparsity) already has a result. Same change:
-      nano jobs take ~15 s and each makes two commits (about 7 commits a minute, 3000+ in four hours),
-      so let the worker commit claim and result together for self-invented jobs, or space them out.
 - [ ] Seed-noise estimate per tier; promotion must beat the champion by more than that noise.
       First number (2026-11-25 21:15): the nano champion's configuration over 15 seeds scores mean
       +0.022, sd 0.005, range +0.014..+0.031. The leaderboard champion is the best of those seeds, so

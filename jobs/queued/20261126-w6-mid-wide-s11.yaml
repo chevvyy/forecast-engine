@@ -1,0 +1,15 @@
+id: 20261126-w6-mid-wide-s11
+tier: mid
+kind: train
+model:
+  d_model: 128
+  n_blocks: 4
+  kernel: 25
+  lookback: 128
+  patch: 2
+  stride: 1
+  dropout: 0.3
+seed: 11
+note: 'v1: width beyond 64 did not help on 63k training rows. With about 18x more
+  rows, does it now?'
+origin: planner

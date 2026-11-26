@@ -9,3 +9,5 @@ train:
 seed: 11
 note: 'runbook: prune + finetune the mid champion, 50%'
 origin: planner
+worker: pc-5070ti
+attempts: 1

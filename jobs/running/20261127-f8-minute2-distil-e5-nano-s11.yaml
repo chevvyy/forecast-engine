@@ -1,0 +1,14 @@
+id: 20261127-f8-minute2-distil-e5-nano-s11
+tier: nano
+config: loop_minute
+kind: distill
+teacher: 20261127-e5-minute2-mid-born-again-a8-s11
+model:
+  lookback: 60
+seed: 11
+note: 'minute nano champion''s shape (preset, lookback 60) distilled from e5, the
+  born-again minute mid (+0.0312, one seed), instead of a8 (+0.0298): from a8 it scores
+  +0.031 over 3 seeds'
+origin: planner
+worker: pc-5070ti
+attempts: 1

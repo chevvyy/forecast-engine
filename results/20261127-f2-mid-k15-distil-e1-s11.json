@@ -1,0 +1,144 @@
+{
+  "config": "loop",
+  "coverage_80": [
+    [
+      0.7997,
+      0.7968
+    ],
+    [
+      0.7908,
+      0.7821
+    ],
+    [
+      0.7967,
+      0.7947
+    ]
+  ],
+  "cpu_ms_per_forecast": 0.236,
+  "data_hash": "500294764fb3",
+  "device": "cuda",
+  "dm": {
+    "all": [
+      -9.780482390739031,
+      1.3655812273591657e-22
+    ],
+    "ret": [
+      -3.515799566306792,
+      0.00043843183642283706
+    ],
+    "vol": [
+      -12.192019098449714,
+      3.428207510966544e-34
+    ]
+  },
+  "eval_version": 2,
+  "finished": "2026-11-27T21:10:06+00:00",
+  "fits_tier": true,
+  "folds": [
+    {
+      "epochs": 14,
+      "es_pinball": 0.23322375118732452,
+      "n_train": 753990,
+      "n_val": 93975,
+      "peak_vram_gb": 1.241
+    },
+    {
+      "epochs": 11,
+      "es_pinball": 0.24146287143230438,
+      "n_train": 838233,
+      "n_val": 94394,
+      "peak_vram_gb": 1.256
+    },
+    {
+      "epochs": 12,
+      "es_pinball": 0.2446817010641098,
+      "n_train": 922663,
+      "n_val": 95360,
+      "peak_vram_gb": 1.268
+    }
+  ],
+  "git": "b77fd6db",
+  "gpu": "NVIDIA GeForce RTX 5070 Ti",
+  "horizons": [
+    1,
+    5,
+    20
+  ],
+  "id": "20261127-f2-mid-k15-distil-e1-s11",
+  "job": {
+    "attempts": 1,
+    "id": "20261127-f2-mid-k15-distil-e1-s11",
+    "kind": "distill",
+    "model": {
+      "d_model": 64,
+      "dropout": 0.2,
+      "ffn": 2,
+      "kernel": 15,
+      "lookback": 256,
+      "n_blocks": 3,
+      "patch": 4,
+      "stride": 2
+    },
+    "note": "third generation: the mid champion's shape distilled from e1 (itself a student of b1; its configuration +0.0437 over 3 seeds). Does a better teacher of the same size give a better student, or has it levelled off as nano did (+0.0467 from b1, +0.0480 on one seed from c1f5)?",
+    "origin": "planner",
+    "seed": 11,
+    "teacher": "20261127-e1-mid-born-again-k15-s11",
+    "tier": "mid",
+    "train": {
+      "batch_size": 2048,
+      "lr": 0.0003
+    },
+    "worker": "pc-5070ti"
+  },
+  "kind": "distill",
+  "minutes": 5.93,
+  "model": {
+    "d_model": 64,
+    "dropout": 0.2,
+    "ffn": 2,
+    "kernel": 15,
+    "lookback": 256,
+    "n_blocks": 3,
+    "patch": 4,
+    "stride": 2
+  },
+  "nonzero_params": 61534,
+  "onnx_bytes": 262653,
+  "onnx_max_abs_diff": 4.76837158203125e-07,
+  "params": 61534,
+  "peak_vram_gb": 1.268,
+  "pinball": {
+    "ret_baseline": 0.3055918514728546,
+    "ret_model": 0.3014313876628876,
+    "vol_baseline": 0.19298601150512695,
+    "vol_har": 0.19298601150512695,
+    "vol_model": 0.17873607575893402,
+    "vol_unconditional": 0.20153072476387024
+  },
+  "rank_ic_h1": 0.006352106273243536,
+  "score": 0.043726831674575806,
+  "skill_ret": 0.013614475727081299,
+  "skill_vol": 0.07383918762207031,
+  "status": "ok",
+  "symbols": 539,
+  "tab": [
+    "log_rv5_rv20",
+    "log_rv60_rv20"
+  ],
+  "tier": "mid",
+  "train": {
+    "batch_size": 2048,
+    "distill_alpha": 0.5,
+    "grad_clip": 1.0,
+    "lr": 0.0003,
+    "max_epochs": 40,
+    "patience": 5,
+    "weight_decay": 0.0001
+  },
+  "universe": {
+    "note": "current index members and megacaps: survivorship bias, return skill is optimistic",
+    "requested": 539
+  },
+  "vol_baseline": "har",
+  "worker": "pc-5070ti"
+}

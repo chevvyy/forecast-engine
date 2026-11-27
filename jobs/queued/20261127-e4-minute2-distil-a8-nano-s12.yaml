@@ -1,9 +1,0 @@
-id: 20261127-e4-minute2-distil-a8-nano-s12
-tier: nano
-config: loop_minute
-kind: distill
-teacher: 20261127-a8-minute2-mid-s11
-seed: 12
-note: third seed of the minute-2 nano preset distilled from a8 (+0.0300, +0.0328 so far; preset without
-  teacher +0.024 over 4 seeds)
-origin: planner

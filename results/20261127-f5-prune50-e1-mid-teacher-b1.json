@@ -1,0 +1,137 @@
+{
+  "config": "loop",
+  "coverage_80": [
+    [
+      0.8,
+      0.7967
+    ],
+    [
+      0.7883,
+      0.7825
+    ],
+    [
+      0.797,
+      0.8059
+    ]
+  ],
+  "cpu_ms_per_forecast": 0.244,
+  "data_hash": "500294764fb3",
+  "device": "cuda",
+  "dm": {
+    "all": [
+      -11.504883810413016,
+      1.2465711411923334e-30
+    ],
+    "ret": [
+      -5.07748320760087,
+      3.82467297683743e-07
+    ],
+    "vol": [
+      -12.277969843523877,
+      1.1894565131459953e-34
+    ]
+  },
+  "eval_version": 2,
+  "finished": "2026-11-27T22:24:45+00:00",
+  "fits_tier": true,
+  "folds": [
+    {
+      "epochs": 11,
+      "es_pinball": 0.2328633815050125,
+      "n_train": 753990,
+      "n_val": 93975,
+      "peak_vram_gb": 1.241
+    },
+    {
+      "epochs": 10,
+      "es_pinball": 0.2413676232099533,
+      "n_train": 838233,
+      "n_val": 94394,
+      "peak_vram_gb": 1.256
+    },
+    {
+      "epochs": 15,
+      "es_pinball": 0.24423491954803467,
+      "n_train": 922663,
+      "n_val": 95360,
+      "peak_vram_gb": 1.269
+    }
+  ],
+  "git": "ec97030e",
+  "gpu": "NVIDIA GeForce RTX 5070 Ti",
+  "horizons": [
+    1,
+    5,
+    20
+  ],
+  "id": "20261127-f5-prune50-e1-mid-teacher-b1",
+  "job": {
+    "attempts": 1,
+    "id": "20261127-f5-prune50-e1-mid-teacher-b1",
+    "init_from": "20261127-e1-mid-born-again-k15-s11",
+    "kind": "prune",
+    "note": "prune and finetune WITH the teacher the parent was distilled from. Without one, a 50% prune of this configuration fell from +0.044 to +0.032 and lost its return skill (e8); the last log row guessed the missing teacher was why",
+    "origin": "planner",
+    "seed": 11,
+    "sparsity": 0.5,
+    "teacher": "20261127-b1-mid-k9-batch2048-lr0003-s12",
+    "tier": "mid",
+    "train": {
+      "batch_size": 2048,
+      "lr": 0.0003,
+      "max_epochs": 15
+    },
+    "worker": "pc-5070ti"
+  },
+  "kind": "prune",
+  "minutes": 5.89,
+  "model": {
+    "d_model": 64,
+    "dropout": 0.2,
+    "ffn": 2,
+    "kernel": 15,
+    "lookback": 256,
+    "n_blocks": 3,
+    "patch": 4,
+    "stride": 2
+  },
+  "nonzero_params": 31412,
+  "onnx_bytes": 262653,
+  "onnx_max_abs_diff": 2.384185791015625e-07,
+  "params": 61534,
+  "peak_vram_gb": 1.269,
+  "pinball": {
+    "ret_baseline": 0.3055918514728546,
+    "ret_model": 0.3007214069366455,
+    "vol_baseline": 0.19298601150512695,
+    "vol_har": 0.19298601150512695,
+    "vol_model": 0.1785254031419754,
+    "vol_unconditional": 0.20153072476387024
+  },
+  "rank_ic_h1": 0.0035906201865531263,
+  "score": 0.04543429613113403,
+  "skill_ret": 0.015937745571136475,
+  "skill_vol": 0.07493084669113159,
+  "status": "ok",
+  "symbols": 539,
+  "tab": [
+    "log_rv5_rv20",
+    "log_rv60_rv20"
+  ],
+  "tier": "mid",
+  "train": {
+    "batch_size": 2048,
+    "distill_alpha": 0.5,
+    "grad_clip": 1.0,
+    "lr": 0.0003,
+    "max_epochs": 15,
+    "patience": 5,
+    "weight_decay": 0.0001
+  },
+  "universe": {
+    "note": "current index members and megacaps: survivorship bias, return skill is optimistic",
+    "requested": 539
+  },
+  "vol_baseline": "har",
+  "worker": "pc-5070ti"
+}

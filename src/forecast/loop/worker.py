@@ -114,7 +114,55 @@ def fits_vram(job: dict, cfg: dict) -> bool:
     return train_vram_gb({**tier["model"], **(job.get("model") or {})}, batch) <= float(limit)
 
 
-def _draw(cfg: dict, ch: dict, tier: str, done: int, rng: random.Random, repo: Path) -> dict:
+# The training settings a mutation or seed re-run takes over from the champion (the ones in the grid).
+RECIPE_KEYS = ("lr", "weight_decay", "batch_size")
+
+
+def recipe(champ: dict, results: list[dict], cfg: dict, repo: Path = REPO) -> dict:
+    """How a champion was made, as job fields: its non-default ``train`` settings and its ``teacher``.
+
+    Until 2026-11-27 a mutation kept the champion's model shape only, so every mutation went back to the
+    default lr and batch size and a mutation of a distilled champion lost its teacher: the search could
+    not climb from a champion whose advantage was in how it was trained. A pruned champion's own
+    settings are finetuning settings, so its recipe is that of the run it descends from (``init_from``,
+    followed through the results of this ``eval.version``); if that run is not on record the recipe is
+    empty. Results are worker-written data: only values that are in the search grid are taken over, and a
+    teacher only if it is a finished run of this version whose checkpoints are on this machine."""
+    ver = cfg["eval"].get("version", 1)
+    by_id = {r["id"]: r for r in results if isinstance(r, dict) and isinstance(r.get("id"), str)
+             and r.get("status") == "ok" and r.get("eval_version", 1) == ver}
+    run, seen = champ, set()
+    while True:
+        job = run.get("job") if isinstance(run.get("job"), dict) else {}
+        parent = job.get("init_from")
+        if not parent:
+            break
+        if not isinstance(parent, str) or parent in seen or parent not in by_id:
+            return {"train": {}}
+        seen.add(parent)
+        run = by_id[parent]
+    out: dict = {"train": {}}
+    used = run.get("train") if isinstance(run.get("train"), dict) else {}
+    for key in RECIPE_KEYS:
+        v = used.get(key)
+        grid = (cfg.get("search") or {}).get(key)
+        if (isinstance(v, int | float) and not isinstance(v, bool) and isinstance(grid, list) and v in grid
+                and v != cfg["train"].get(key)):
+            out["train"][key] = grid[grid.index(v)]
+    teacher = job.get("teacher")
+    if isinstance(teacher, str) and teacher in by_id and artifact_dir(teacher, repo):
+        out["teacher"] = teacher
+    return out
+
+
+def _with_recipe(job: dict, rec: dict) -> dict:
+    """A job trained the way the champion was: with its teacher, if it had one."""
+    if rec.get("teacher"):
+        job["kind"], job["teacher"] = "distill", rec["teacher"]
+    return job
+
+
+def _draw(cfg: dict, ch: dict, tier: str, done: int, rng: random.Random, repo: Path, rec: dict) -> dict:
     s, order = cfg["search"], ["nano", "mid", "large"]
     base = dict(ch[tier]["model"])
     roll = rng.random()
@@ -126,7 +174,7 @@ def _draw(cfg: dict, ch: dict, tier: str, done: int, rng: random.Random, repo: P
         return {"tier": tier, "kind": "prune", "init_from": ch[tier]["id"],
                 "sparsity": rng.choice(s["prune_sparsity"]), "train": {"lr": 0.0003, "max_epochs": 15},
                 "note": "prune + finetune champion"}
-    model, train = base, {}
+    model, train = base, dict(rec["train"])   # the champion's recipe; a mutated key overrides it below
     explore = 3 if done < 12 else 2
     for key in rng.sample(["d_model", "n_blocks", "kernel", "lookback", "patch", "ffn", "dropout",
                            "lr", "weight_decay", "batch_size"], k=explore):
@@ -140,13 +188,14 @@ def _draw(cfg: dict, ch: dict, tier: str, done: int, rng: random.Random, repo: P
             model[key] = v
     if model["lookback"] < 2 * model["patch"]:
         model["patch"], model["stride"] = 4, 2
-    return {"tier": tier, "kind": "train", "model": model, "train": train,
-            "note": f"mutation of {ch[tier]['id']}"}
+    return _with_recipe({"tier": tier, "kind": "train", "model": model, "train": train,
+                         "note": f"mutation of {ch[tier]['id']}"}, rec)
 
 
 def propose(cfg: dict, results: list[dict], tiers: list[str], rng: random.Random, repo: Path = REPO) -> dict:
-    """Invent the next experiment: mutate the tier champion, or distil a bigger champion into a
-    smaller tier, or prune-and-finetune the champion. Every proposal carries a seed. A proposal is
+    """Invent the next experiment: mutate the tier champion (keeping how it was trained, see
+    ``recipe``), or distil a bigger champion into a smaller tier, or prune-and-finetune the champion.
+    Every proposal carries a seed. A proposal is
     dropped and redrawn if the same job already has a result, if it is a distil / prune configuration
     that already ran ``MAX_REPEATS`` times, or if its training would not fit the tier's VRAM."""
     ver = cfg["eval"].get("version", 1)
@@ -168,17 +217,19 @@ def propose(cfg: dict, results: list[dict], tiers: list[str], rng: random.Random
         except (KeyError, TypeError, ValueError):
             continue   # results are worker-written data: skip anything malformed
         repeats[key] = repeats.get(key, 0) + 1
+    rec = recipe(ch[tier], results, cfg, repo)
     for _ in range(20):
-        job = _draw(cfg, ch, tier, done, rng, repo)
+        job = _draw(cfg, ch, tier, done, rng, repo, rec)
         job["seed"] = rng.randrange(10**6)
         if job["kind"] != "train" and repeats.get(signature(job, cfg, seed=False), 0) >= MAX_REPEATS:
             continue
         if signature(job, cfg) in exact or not fits_vram(job, cfg):
             continue
         return job
-    # Nothing new that fits came up: another seed of the champion's shape is still information.
-    return {"tier": tier, "kind": "train", "model": dict(ch[tier]["model"]), "seed": rng.randrange(10**6),
-            "note": f"seed re-run of {ch[tier]['id']}"}
+    # Nothing new that fits came up: another seed of the champion's configuration is still information.
+    return _with_recipe({"tier": tier, "kind": "train", "model": dict(ch[tier]["model"]),
+                         "train": dict(rec["train"]), "seed": rng.randrange(10**6),
+                         "note": f"seed re-run of {ch[tier]['id']}"}, rec)
 
 
 def track_ready(cfg: dict) -> bool:

@@ -241,6 +241,63 @@ def test_proposals_carry_a_seed_and_are_not_repeated(tmp_path):
                    ["nano"], random.Random(7), tmp_path)["tier"] == "nano"
 
 
+def test_mutations_and_seed_reruns_keep_how_the_champion_was_trained(tmp_path):
+    """2026-11-27: a mutation started from the champion's shape but from the default training settings, so
+    with champions made by batch 2048 / lr 0.0003 (mid, large) or by a teacher (nano) nearly every
+    self-invented run was a known-worse recipe: the search could not climb."""
+    from forecast.loop.worker import propose, recipe
+
+    cfg = yaml.safe_load((ROOT / "configs" / "loop.yaml").read_text())
+    cfg["search"].update(p_distill=0.0, p_prune=0.0, tracks={})
+    ver = cfg["eval"]["version"]
+
+    def result(rid, tier, score, train=None, **job):
+        r = _fake_result(rid, tier, cfg, score, **job)
+        return {**r, "train": {**cfg["train"], **(job.get("train") or {}), **(train or {})}}
+
+    mid = result("m0", "mid", 0.04, train={"batch_size": 2048, "lr": 0.0003})
+    nano = result("n0", "nano", 0.05, kind="distill", teacher="m0")
+    res = [mid, nano, result("n1", "nano", 0.03)]
+    (tmp_path / "models" / "m0").mkdir(parents=True)
+    (tmp_path / "models" / "m0" / "fold0.pt").touch()
+    assert recipe(mid, res, cfg, tmp_path) == {"train": {"batch_size": 2048, "lr": 0.0003}}
+    assert recipe(nano, res, cfg, tmp_path) == {"train": {}, "teacher": "m0"}
+    for k in range(60):
+        job = propose(cfg, res, ["mid"], random.Random(k), tmp_path)
+        assert job["kind"] == "train" and "teacher" not in job
+        # Unless the mutation drew that very key, the champion's value is kept; a drawn key is from the grid.
+        assert job["train"]["batch_size"] in cfg["search"]["batch_size"] and job["train"]["lr"] in cfg["search"]["lr"]
+        job = propose(cfg, res, ["nano"], random.Random(k), tmp_path)
+        assert job["kind"] == "distill" and job["teacher"] == "m0" and isinstance(job["seed"], int)
+    kept = [propose(cfg, res, ["mid"], random.Random(k), tmp_path)["train"] for k in range(200)]
+    assert sum(t["batch_size"] == 2048 for t in kept) > 150 and sum(t["lr"] == 0.0003 for t in kept) > 150
+    # The teacher's checkpoints are not on this machine: train without it instead of failing every job.
+    assert "teacher" not in propose(cfg, res, ["nano"], random.Random(1), tmp_path / "elsewhere")
+    # A pruned champion was finetuned (lr 0.0003, 15 epochs); its recipe is that of the run it came from.
+    pruned = result("m1", "mid", 0.05, kind="prune", init_from="m0", sparsity=0.5, train={"lr": 0.001, "max_epochs": 15})
+    assert recipe(pruned, res + [pruned], cfg, tmp_path) == {"train": {"batch_size": 2048, "lr": 0.0003}}
+    orphan = result("m2", "mid", 0.06, kind="prune", init_from="gone", sparsity=0.5, train={"batch_size": 2048})
+    assert recipe(orphan, res + [orphan], cfg, tmp_path) == {"train": {}}
+    loop = [result("a", "mid", 0.07, init_from="b"), result("b", "mid", 0.0, init_from="a")]
+    assert recipe(loop[0], loop, cfg, tmp_path) == {"train": {}}
+    # Results are worker-written data: values outside the grid, other types, a teacher that is not a
+    # finished run of this version, or a junk job are not taken over.
+    for bad in ({"train": {"lr": 5.0, "batch_size": True, "weight_decay": "0.01"}},
+                {"train": "junk"}, {"job": "junk"}, {"job": {"teacher": "../../etc"}},
+                {"job": {"teacher": ["m0"]}}, {"job": {"teacher": "old"}}):
+        old = {**mid, "id": "old", "eval_version": ver - 1}
+        assert recipe({**result("x", "mid", 0.9), **bad}, res + [old], cfg, tmp_path) == {"train": {}}
+    # When no draw is usable (here: none fits the VRAM limit), the fallback is a real seed re-run: the
+    # champion's shape AND its recipe. It used to be the shape at the default settings.
+    cfg["tiers"]["mid"]["max_train_vram_gb"] = 0.01
+    job = propose(cfg, res, ["mid"], random.Random(0), tmp_path)
+    assert job["note"] == "seed re-run of m0" and job["model"] == mid["model"]
+    assert job["train"] == {"batch_size": 2048, "lr": 0.0003} and isinstance(job["seed"], int)
+    cfg["tiers"]["nano"]["max_train_vram_gb"] = 0.01
+    job = propose(cfg, res, ["nano"], random.Random(0), tmp_path)
+    assert job["note"] == "seed re-run of n0" and job["kind"] == "distill" and job["teacher"] == "m0"
+
+
 def test_proposed_shapes_fit_the_tier_vram():
     """A 255-token, d_model 512, 8-block mutation cannot train in 16 GB at batch 512; proposing it
     costs a failed or spilled run every time (2026-11-26)."""

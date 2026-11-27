@@ -7,6 +7,8 @@ train:
   lr: 0.0003
   max_epochs: 15
 seed: 11
-note: prune and finetune the new nano champion c1 at 30% (finetune has no teacher); an 85% prune by the
-  worker scored +0.0157
+note: prune and finetune the new nano champion c1 at 30% (finetune has no teacher);
+  an 85% prune by the worker scored +0.0157
 origin: planner
+worker: pc-5070ti
+attempts: 1

@@ -8,5 +8,8 @@ train:
   max_epochs: 15
   batch_size: 2048
 seed: 11
-note: prune and finetune the new mid champion c1f5 at 50%; an 85% prune of d4 by the worker kept +0.0207
+note: prune and finetune the new mid champion c1f5 at 50%; an 85% prune of d4 by the
+  worker kept +0.0207
 origin: planner
+worker: pc-5070ti
+attempts: 1

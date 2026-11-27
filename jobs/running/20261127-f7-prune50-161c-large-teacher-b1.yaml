@@ -9,6 +9,8 @@ train:
   max_epochs: 15
   batch_size: 2048
 seed: 11
-note: prune and finetune the large champion at 50%, keeping its teacher b1 (prunes of c6, which had no
-  teacher, kept +0.015 of +0.024)
+note: prune and finetune the large champion at 50%, keeping its teacher b1 (prunes
+  of c6, which had no teacher, kept +0.015 of +0.024)
 origin: planner
+worker: pc-5070ti
+attempts: 1

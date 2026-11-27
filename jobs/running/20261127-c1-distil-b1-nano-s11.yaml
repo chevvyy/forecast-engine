@@ -12,6 +12,8 @@ model:
   ffn: 2
   dropout: 0.2
 seed: 11
-note: seed re-run of the worker's distil of mid b1 into the nano champion shape (03cf +0.0451 at the default
-  lr, where direct training averages +0.032 over 6 seeds)
+note: seed re-run of the worker's distil of mid b1 into the nano champion shape (03cf
+  +0.0451 at the default lr, where direct training averages +0.032 over 6 seeds)
 origin: planner
+worker: pc-5070ti
+attempts: 1

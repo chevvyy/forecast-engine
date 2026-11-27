@@ -2,8 +2,8 @@
 
   python -m forecast.loop.worker --name pc-5070ti --tiers large,mid,nano
 
-Loop: pull -> claim a queued job that fits this machine (or invent one when the queue is empty) ->
-run it -> commit the result -> push. Files are one-per-job and one-per-worker, so pushes from two
+Loop: pull -> claim a queued job that fits this machine (or invent one when the queue is empty; a
+share of invented jobs goes to other tracks, see ``pick_track``) -> run it -> commit the result -> push. Files are one-per-job and one-per-worker, so pushes from two
 machines never conflict; a lost claim race is detected by the rejected push and simply retried.
 Exit code 3 means "code changed upstream, restart me" (the run_worker scripts do that).
 """
@@ -181,6 +181,36 @@ def propose(cfg: dict, results: list[dict], tiers: list[str], rng: random.Random
             "note": f"seed re-run of {ch[tier]['id']}"}
 
 
+def track_ready(cfg: dict) -> bool:
+    """Whether this machine can load a track's bars: the Alpaca source needs keys in ``.env``."""
+    return cfg["data"].get("source") != "alpaca" or alpaca.available()
+
+
+def pick_track(cfg: dict, rng: random.Random, repo: Path = REPO) -> tuple[str | None, dict]:
+    """Which track the next self-invented job belongs to. ``search.tracks`` in the daily config gives
+    other tracks a share of those jobs (``{loop_minute: 0.3}``); the rest stay daily. A track is only
+    picked if its config loads, has its own ``search`` grid and ``eval.version``, and this machine can
+    load its bars; otherwise the job is a daily one, so a worker without keys loses nothing.
+    Returns ``(None, cfg)`` for the daily track, else the track's config name and config."""
+    tracks = (cfg.get("search") or {}).get("tracks") or {}
+    if not isinstance(tracks, dict) or not tracks:
+        return None, cfg
+    roll, acc = rng.random(), 0.0
+    for name, share in tracks.items():
+        try:
+            acc += float(share)
+            if roll >= acc:
+                continue
+            other = load_cfg(repo, name)
+            if (other["eval"]["version"] != cfg["eval"].get("version", 1) and other["search"]
+                    and set(other["tiers"]) >= set(cfg["tiers"]) and track_ready(other)):
+                return str(name), other
+        except (OSError, ValueError, KeyError, TypeError, AttributeError, yaml.YAMLError):
+            pass   # no such config on this branch, or an incomplete one: stay on the daily track
+        break
+    return None, cfg
+
+
 def runnable(job: dict, cfg: dict, tiers: list[str], vram_free: float, repo: Path) -> bool:
     if job.get("tier") not in tiers:
         return False
@@ -208,7 +238,9 @@ def step(name: str, tiers: list[str], git: Git, rng: random.Random, repo: Path =
         if runnable(cand, cand_cfg, tiers, info["vram_free_gb"] if info["device"] == "cuda" else 0.0, repo):
             job, src, cfg = cand, p, cand_cfg
             break
+    track = None
     if job is None:
+        track, cfg = pick_track(cfg, rng, repo)
         usable = [t for t in tiers
                   if info["device"] != "cuda" or cfg["tiers"][t]["min_vram_gb"] <= info["vram_free_gb"]]
         if not usable:
@@ -216,6 +248,8 @@ def step(name: str, tiers: list[str], git: Git, rng: random.Random, repo: Path =
         job = propose(cfg, load_results(repo), usable, rng, repo)
         job["id"] = new_id(name, rng)
         job["origin"] = "worker"
+        if track:
+            job["config"] = track   # run_job, champions and the leaderboard go by the track's eval.version
     job["worker"] = name
     job["attempts"] = int(job.get("attempts", 0)) + 1
     dst = running / f"{job['id']}.yaml"

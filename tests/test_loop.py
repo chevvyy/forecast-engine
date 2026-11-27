@@ -36,6 +36,7 @@ def _setup(tmp_path: Path) -> tuple[Path, Path]:
         t["model"].update(lookback=32, d_model=8, n_blocks=1, kernel=5, patch=4, stride=2)
     cfg["search"]["lookback"] = {k: [32, 64] for k in ("nano", "mid", "large")}
     cfg["search"]["d_model"] = {k: [8, 12] for k in ("nano", "mid", "large")}
+    cfg["search"]["tracks"] = {}   # self-invented jobs stay daily unless a test hands out a share
     (seed / "configs" / "loop.yaml").write_text(yaml.safe_dump(cfg))
     for d in ["queued", "running", "done"]:
         (seed / "jobs" / d).mkdir()
@@ -356,7 +357,7 @@ def test_minute_track_runs_from_its_own_config_and_never_competes_with_daily(tmp
     (q / "bad2.yaml").write_text(yaml.safe_dump({"id": "bad2", "tier": "nano", "config": "no_such_track"}))
     assert ga.publish("minute track", ["configs", "jobs"])
     rng = random.Random(2)
-    for _ in range(3):   # min1 (minute), q1 (daily), then a self-invented job, which must be daily
+    for _ in range(3):   # min1 (minute), q1 (daily), then a self-invented job: daily, no share is handed out
         step("wa", ["nano"], ga, rng, repo=a, device="cpu", allow_cpu=True)
     res = load_results(a)
     by = {r["id"]: r for r in res}
@@ -380,6 +381,55 @@ def test_minute_track_runs_from_its_own_config_and_never_competes_with_daily(tmp
     assert sorted(p.stem for p in q.glob("*.yaml")) == ["bad1", "bad2"]
 
 
+def test_worker_gives_a_share_of_its_own_jobs_to_the_minute_track_only_if_it_can_load_it(tmp_path, monkeypatch):
+    """Minute bars part (c): a worker with Alpaca keys invents minute jobs too, from the minute track's
+    own champions and grid; a worker without keys, or a branch without the track, stays daily."""
+    from forecast.data import alpaca
+    from forecast.loop.run_job import load_cfg
+    from forecast.loop.worker import pick_track
+
+    a, _ = _setup(tmp_path)
+    ga = Git(a, "loop")
+    daily = load_cfg(a)
+    daily["search"]["tracks"] = {"loop_minute": 1.0}
+    rng = random.Random(1)
+    assert pick_track(daily, rng, a) == (None, daily)                      # no such config on the branch
+    assert pick_track({**daily, "search": {**daily["search"], "tracks": {"../loop": 1.0}}}, rng, a)[0] is None
+    minute = _minute_cfg()
+    minute["search"]["d_model"] = {k: [8, 12] for k in ("nano", "mid", "large")}
+    (a / "configs" / "loop_minute.yaml").write_text(yaml.safe_dump({**minute, "data": {"source": "alpaca"}}))
+    monkeypatch.setattr(alpaca, "available", lambda: False)
+    assert pick_track(daily, rng, a)[0] is None                            # the track needs keys: none here
+    monkeypatch.setattr(alpaca, "available", lambda: True)
+    assert pick_track(daily, rng, a)[0] == "loop_minute"
+    assert pick_track({**daily, "search": {**daily["search"], "tracks": {"loop_minute": 0.0}}}, rng, a)[0] is None
+    same = {**minute, "eval": {**minute["eval"], "version": daily["eval"]["version"]}, "data": {"source": "alpaca"}}
+    (a / "configs" / "loop_minute.yaml").write_text(yaml.safe_dump(same))
+    assert pick_track(daily, rng, a)[0] is None                            # a shared version would compete
+    (a / "configs" / "loop_minute.yaml").write_text(yaml.safe_dump({**minute, "search": None}))
+    assert pick_track(daily, rng, a)[0] is None                            # no grid to draw from
+    # End to end on synthetic sessions: every self-invented job goes to the minute track.
+    (a / "configs" / "loop_minute.yaml").write_text(yaml.safe_dump(minute))
+    (a / "configs" / "loop.yaml").write_text(yaml.safe_dump(daily))
+    assert ga.publish("hand the minute track a share", ["configs"])
+    assert "q1 ok" in step("wa", ["nano"], ga, rng, repo=a, device="cpu", allow_cpu=True)   # queue first
+    for _ in range(4):
+        assert " ok" in step("wa", ["nano", "mid"], ga, rng, repo=a, device="cpu", allow_cpu=True)
+    res = {r["id"]: r for r in load_results(a)}
+    own = [r for r in res.values() if r["id"] != "q1"]
+    mver, dver = minute["eval"]["version"], daily["eval"]["version"]
+    assert res["q1"]["eval_version"] == dver and res["q1"]["config"] == "loop"
+    assert len(own) == 4 and all(r["status"] == "ok" for r in own), [r.get("error") for r in own]
+    assert all(r["eval_version"] == mver and r["config"] == "loop_minute" and r["job"]["config"] == "loop_minute"
+               and r["job"]["origin"] == "worker" and r["tab"][-2:] == ["tod", "tod_u"] for r in own)
+    assert {r["tier"] for r in own} == {"nano", "mid"}                     # each tier's preset first
+    assert all(r["model"]["lookback"] <= minute["task"]["max_lookback"] for r in own)
+    # The tracks still never compete: the daily champion is the daily run, whatever the minute scores are.
+    assert champions(list(res.values()), dver)["nano"]["id"] == "q1"
+    assert champions(list(res.values()), mver)["nano"]["id"] != "q1"
+    assert not list((a / "jobs" / "running").glob("*.yaml"))
+
+
 def test_minute_config_is_a_separate_track_that_fits_inside_a_session():
     daily = yaml.safe_load((ROOT / "configs" / "loop.yaml").read_text())
     minute = yaml.safe_load((ROOT / "configs" / "loop_minute.yaml").read_text())
@@ -393,3 +443,10 @@ def test_minute_config_is_a_separate_track_that_fits_inside_a_session():
     assert ev["holdout_frac"] >= daily["eval"]["holdout_frac"]
     assert all(t["model"]["lookback"] <= task["max_lookback"] for t in minute["tiers"].values())
     assert set(minute["tiers"]) == set(daily["tiers"])
+    # Self-invented minute jobs: the grid has every key the worker draws and no lookback past a session's
+    # window; the daily config hands out the share, and less than half of the worker's own jobs.
+    assert set(daily["search"]) - {"tracks"} <= set(minute["search"]) and "tracks" not in minute["search"]
+    assert all(lb <= task["max_lookback"] for opts in minute["search"]["lookback"].values() for lb in opts)
+    assert set(minute["search"]["lookback"]) == set(minute["tiers"])
+    assert 0 < sum(daily["search"]["tracks"].values()) < 0.5
+    assert all((ROOT / "configs" / f"{name}.yaml").exists() for name in daily["search"]["tracks"])

@@ -74,3 +74,8 @@ search:
   # prune. Distil stays low while no bigger tier's champion scores above the smaller tier's.
   p_distill: 0.1
   p_prune: 0.15
+  # Share of self-invented jobs a worker gives to another track (configs/<name>.yaml), if it can load
+  # that track's bars (minute bars need Alpaca keys in .env; a worker without them stays daily). The job
+  # is invented from that track's own champions and `search` grid and scored on its own board. By count,
+  # not by time: a minute job takes about half a minute, a daily one 2 to 30.
+  tracks: {loop_minute: 0.3}

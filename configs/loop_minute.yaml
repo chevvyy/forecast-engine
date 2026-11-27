@@ -1,9 +1,11 @@
 # Minute-bar track of the loop. A job runs under this file only if it says `config: loop_minute`
-# (jobs/README.md); workers never invent minute jobs on their own. Its scores live under their own
-# eval.version, so they never compete with the daily track (configs/loop.yaml), and on their own board:
+# (jobs/README.md). Since 2026-11-26 21:15 a worker with Alpaca keys gives a share of its self-invented
+# jobs to this track (`search.tracks` in configs/loop.yaml, `worker.pick_track`), drawn from the `search`
+# grid at the end of this file. Its scores live under their own eval.version, so they never compete with
+# the daily track (configs/loop.yaml), and on their own board:
 #   python -m forecast.loop.leaderboard --config loop_minute   ->  experiments/LEADERBOARD_minute.md
-# Status 2026-11-26: two runs on real Alpaca minute bars under minute-1 (y8, z8). minute-2 adds the time of
-# day as a model input and a volatility baseline that knows it; no minute-2 run on real bars yet.
+# Status 2026-11-26: minute-1 closed with two runs on real Alpaca minute bars (y8, z8). minute-2 adds the
+# time of day as a model input and a volatility baseline that knows it: 3 runs on real bars (a6, a7, a8).
 branch: loop
 
 data:
@@ -69,3 +71,20 @@ tiers:
     min_vram_gb: 6
     max_minutes: 60
     model: {lookback: 120, patch: 4, stride: 2, d_model: 256, n_blocks: 4, kernel: 51, ffn: 4, dropout: 0.2}
+
+# Grid for self-invented jobs of this track (same keys as configs/loop.yaml -> search). Lookbacks must fit
+# task.max_lookback (a test checks it). No `tracks` here: only the daily config hands out shares.
+search:
+  d_model: {nano: [16, 24, 32, 48], mid: [64, 96, 128, 192, 256], large: [256, 384, 512, 768]}
+  n_blocks: {nano: [1, 2, 3], mid: [2, 3, 4, 6], large: [4, 6, 8, 12]}
+  kernel: [5, 9, 15, 25, 51]
+  lookback: {nano: [30, 60, 120], mid: [60, 120], large: [60, 120]}
+  patch: [[2, 1], [4, 2], [8, 4], [16, 8]]
+  ffn: [1, 2, 4]
+  dropout: [0.0, 0.1, 0.2, 0.3]
+  lr: [0.0003, 0.001, 0.003]
+  weight_decay: [0.0, 0.0001, 0.001, 0.01]
+  batch_size: [256, 512, 1024, 2048]
+  prune_sparsity: [0.3, 0.5, 0.7, 0.85]
+  p_distill: 0.1
+  p_prune: 0.15

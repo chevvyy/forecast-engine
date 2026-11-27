@@ -21,8 +21,8 @@ Conventions and limits, so nobody has to guess:
 
 - ``t`` is the START of the minute (Alpaca's convention), in UTC. The 09:30 ET bar covers
   09:30:00-09:30:59 and is only known at 09:31. Features must treat a bar as known at ``t`` + 1 minute.
-- Regular session only: bars starting 09:30 <= New York time < 16:00, Monday to Friday. No exchange
-  calendar yet, so on half-days the few after-hours bars between 13:00 and 16:00 are kept. Missing
+- Regular session only: bars starting 09:30 <= New York time < 16:00, Monday to Friday, and < 13:00 on
+  an early-close day (``forecast.data.calendar``; holidays have no bars and need no entry). Missing
   minutes are left missing (no forward fill here).
 - Free plan: the newest 15 minutes of SIP data are refused, so nothing newer than 16 minutes is asked for.
 - Free plan: 200 requests/min; requests are spaced to stay near 170/min, and a 429 backs off.
@@ -43,6 +43,7 @@ from zoneinfo import ZoneInfo
 
 import polars as pl
 
+from forecast.data.calendar import EARLY_CLOSES
 from forecast.utils.common import REPO, data_root
 
 BASE = "https://data.alpaca.markets/v2/stocks"
@@ -139,9 +140,12 @@ def fetch_bars(symbol: str, start: datetime, end: datetime, creds: tuple[str, st
 
 
 def regular_session(df: pl.DataFrame) -> pl.DataFrame:
-    """Keep bars that start inside 09:30-16:00 New York time on a weekday (see module docstring)."""
+    """Keep bars that start inside the regular New York session on a weekday: 09:30-16:00, or
+    09:30-13:00 on an early-close day (``forecast.data.calendar``). Applied when bars are fetched and
+    again on load, so a month stored before the calendar existed loses its late-session bars too."""
     ny = pl.col("t").dt.convert_time_zone("America/New_York")
-    return df.filter((ny.dt.time() >= dtime(9, 30)) & (ny.dt.time() < dtime(16, 0)) & (ny.dt.weekday() <= 5))
+    close = pl.when(ny.dt.date().is_in(sorted(EARLY_CLOSES))).then(dtime(13, 0)).otherwise(dtime(16, 0))
+    return df.filter((ny.dt.time() >= dtime(9, 30)) & (ny.dt.time() < close) & (ny.dt.weekday() <= 5))
 
 
 def month_starts(start: datetime, end: datetime) -> list[datetime]:
@@ -160,10 +164,12 @@ def _write(df: pl.DataFrame, path: Path) -> None:
 
 def has_session_minute(lo: datetime, hi: datetime) -> bool:
     """Does ``lo <= t <= hi`` contain a minute that ``regular_session`` would keep? (Weekday, 09:30 to
-    15:59 New York; holidays are not known here, so a holiday still counts as a session.)"""
+    15:59 New York, to 12:59 on an early-close day; holidays are not known here, so a holiday still
+    counts as a session.)"""
     day = lo.astimezone(ZoneInfo("America/New_York")).replace(hour=0, minute=0, second=0, microsecond=0)
     while day <= hi:
-        if day.weekday() < 5 and max(lo, day.replace(hour=9, minute=30)) <= min(hi, day.replace(hour=15, minute=59)):
+        last = day.replace(hour=12 if day.date() in EARLY_CLOSES else 15, minute=59)
+        if day.weekday() < 5 and max(lo, day.replace(hour=9, minute=30)) <= min(hi, last):
             return True
         day = (day + timedelta(days=1)).replace(hour=0)   # wall-clock midnight, also across a DST change
     return False
@@ -297,7 +303,7 @@ def load(symbols: list[str], start: datetime, now: datetime | None = None,
     ingest(symbols, start, now, creds, end=end if pinned else None)
     frames = []
     for s in symbols:
-        raw = stored(s, start.date()).filter(pl.col("t") >= start)
+        raw = regular_session(stored(s, start.date()).filter(pl.col("t") >= start))
         if pinned:
             raw = raw.filter(pl.col("t") < end)
         if raw.height:

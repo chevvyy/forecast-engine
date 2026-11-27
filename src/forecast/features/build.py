@@ -21,8 +21,10 @@ session the forecast is made, taken from the clock at ``known`` and nothing else
 strong shape over the session (high at the open, low at midday, rising into the close), so a model or
 a baseline without the clock cannot tell a quiet lunch hour from a calm market. Daily rows have no such
 columns: the daily ``tab`` and everything computed from it are unchanged.
-Known gaps: the session is assumed to be 09:30-16:00 New York (on a half-day the time of day does not
-know the early close), and horizons are counted in bars (the grid rule makes that equal to clock time).
+On an early-close day (``forecast.data.calendar``) the session is 09:30-13:00, and the time of day is
+the share of THAT session: 12:45 on such a day is "15 minutes before the close", as 15:45 is on a full
+day. The calendar is published in advance, so this is still the clock alone.
+Known gap: horizons are counted in bars (the grid rule makes that equal to clock time).
 """
 from __future__ import annotations
 
@@ -31,6 +33,7 @@ from dataclasses import dataclass
 import numpy as np
 import polars as pl
 
+from forecast.data.calendar import session_seconds_of
 from forecast.utils.common import DAY
 
 CHANNELS = ["ret", "abs_ret", "range", "vol_z", "mkt_ret", "gap"]
@@ -51,13 +54,15 @@ def grid_runs(tsec: np.ndarray, bar_seconds: int) -> np.ndarray:
 
 
 def time_of_day(known: np.ndarray) -> np.ndarray:
-    """Share of the regular New York session elapsed at epoch second ``known``, in [0, 1].
-    A function of the clock alone (daylight saving included), so it cannot carry anything from a bar."""
+    """Share of the regular New York session elapsed at epoch second ``known``, in [0, 1]: of 09:30-16:00,
+    or of 09:30-13:00 on an early-close day. A function of the clock and the published exchange
+    calendar alone (daylight saving included), so it cannot carry anything from a bar."""
     ny = pl.Series("t", np.asarray(known, dtype=np.int64) * 1_000_000).cast(pl.Datetime("us", "UTC"))
     ny = ny.dt.convert_time_zone("America/New_York")
     sec = (ny.dt.hour().cast(pl.Int64) * 3600 + ny.dt.minute().cast(pl.Int64) * 60
            + ny.dt.second().cast(pl.Int64)).to_numpy()
-    return np.clip((sec - SESSION_OPEN) / SESSION_SECONDS, 0.0, 1.0)
+    length = session_seconds_of(ny.dt.date().cast(pl.Int32).to_numpy())
+    return np.clip((sec - SESSION_OPEN) / length, 0.0, 1.0)
 
 
 class Windows:

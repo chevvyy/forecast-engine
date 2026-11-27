@@ -328,3 +328,21 @@ def test_has_session_minute():
     assert not alpaca.has_session_minute(u(2024, 3, 8, 21, 0), u(2024, 3, 11, 13, 29))   # DST began 03-10
     assert alpaca.has_session_minute(u(2024, 3, 8, 21, 0), u(2024, 3, 11, 13, 30))       # 09:30 EDT
     assert not alpaca.has_session_minute(u(2024, 3, 5), u(2024, 3, 4))                   # empty range
+
+
+def test_load_drops_the_late_session_of_an_early_close_already_in_the_store(api, monkeypatch):
+    """A month ingested before the calendar existed still holds 13:00-16:00 bars of a half-day; ``load``
+    must not return them, and the raw store stays as it is."""
+    monkeypatch.setenv("ALPACA_API_KEY", CREDS[0])
+    monkeypatch.setenv("ALPACA_SECRET_KEY", CREDS[1])
+    before = alpaca.load(["SPY", "QQQ"], START, NOW)
+    stored = alpaca.stored("SPY").height
+    monkeypatch.setattr(alpaca, "EARLY_CLOSES", frozenset({datetime(2024, 2, 1).date()}))  # noqa: DTZ001
+    after = alpaca.load(["SPY", "QQQ"], START, NOW)
+    ny = pl.col("t").dt.convert_time_zone("America/New_York")
+    half = after.filter(ny.dt.date() == datetime(2024, 2, 1).date()).with_columns(ny.alias("ny"))  # noqa: DTZ001
+    assert half.height and half["ny"].dt.strftime("%H:%M").max() == "12:30"
+    assert before.height - after.height == 2 * 6                    # 13:00 .. 15:30, two symbols
+    assert alpaca.stored("SPY").height == stored
+    other = ny.dt.date() != datetime(2024, 2, 1).date()             # noqa: DTZ001
+    assert before.filter(other).equals(after.filter(other))

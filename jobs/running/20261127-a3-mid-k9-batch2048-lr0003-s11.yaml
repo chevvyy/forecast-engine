@@ -17,3 +17,5 @@ seed: 11
 note: lr 0.0003 helped nano at batch 512; does it add to batch 2048 in mid? compare
   with z7 (same seed)
 origin: planner
+worker: pc-5070ti
+attempts: 1

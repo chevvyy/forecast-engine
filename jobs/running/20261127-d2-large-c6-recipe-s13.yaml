@@ -16,3 +16,5 @@ train:
 seed: 13
 note: second seed re-run of c6
 origin: planner
+worker: pc-5070ti
+attempts: 1

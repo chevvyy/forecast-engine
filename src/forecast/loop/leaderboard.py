@@ -5,7 +5,9 @@ can recompute it, so two workers never fight over a shared file.
 """
 from __future__ import annotations
 
+import json
 import math
+import statistics
 from pathlib import Path
 
 from forecast.utils.common import REPO, read_json
@@ -40,6 +42,65 @@ def champions(results: list[dict], eval_version: int | None = None) -> dict[str,
     return best
 
 
+def config_key(r: dict) -> str:
+    """What a run trained, without its seed: tier, model shape, training settings as the run recorded
+    them (presets and defaults already filled in), teacher, parent and sparsity. ``kind`` is left out
+    because it is only a label (jobs/README.md). Results are worker-written data: anything that is not
+    the expected type is ignored, which at worst puts a malformed run in a group of its own."""
+    job = r.get("job") if isinstance(r.get("job"), dict) else {}
+    part = {k: r.get(k) if isinstance(r.get(k), dict) else job.get(k) for k in ("model", "train")}
+    return json.dumps({"tier": r.get("tier"), **part,
+                       **{k: job.get(k) for k in ("teacher", "init_from", "sparsity")}},
+                      sort_keys=True, default=str)
+
+
+def configurations(results: list[dict], eval_version: int | str | None = None, min_seeds: int = 2) -> list[dict]:
+    """Runs grouped into configurations (``config_key``) and scored by the MEAN over their seeds.
+
+    The single-run board ranks the luckiest seed of everything tried, so its top score overstates the
+    configuration behind it (by about two seed-sd on 2026-11-25). A configuration counts here only with
+    ``min_seeds`` different seeds; two runs with one seed are one draw (before 2026-11-26 distil jobs had
+    no seed and repeated score for score), and the first to finish is kept. Same filter as ``champions``:
+    finished, inside the tier budget, finite score, this ``eval_version``. ``sd`` is the sample standard
+    deviation. Best mean first; ``runs`` are in order of finishing, so ``runs[0]`` is the first run."""
+    groups: dict[str, dict[int, dict]] = {}
+    for r in sorted(results, key=lambda r: str(r.get("finished", ""))):
+        if r.get("status") != "ok" or not r.get("fits_tier"):
+            continue
+        if not math.isfinite(r.get("score", math.nan)):
+            continue
+        if eval_version is not None and r.get("eval_version", 1) != eval_version:
+            continue
+        job = r.get("job") if isinstance(r.get("job"), dict) else {}
+        try:
+            seed = int(job.get("seed", 1337))
+        except (TypeError, ValueError):
+            continue
+        groups.setdefault(config_key(r), {}).setdefault(seed, r)
+    out = []
+    for by_seed in groups.values():
+        runs = list(by_seed.values())
+        if len(runs) < max(min_seeds, 1):
+            continue
+        scores = [r["score"] for r in runs]
+        def mean(k: str, runs: list[dict] = runs) -> float:
+            vals = [r[k] for r in runs if isinstance(r.get(k), int | float) and math.isfinite(r[k])]
+            return statistics.fmean(vals) if vals else math.nan
+        out.append({"tier": runs[0]["tier"], "n": len(runs), "mean": statistics.fmean(scores),
+                    "sd": statistics.stdev(scores) if len(runs) > 1 else math.nan,
+                    "min": min(scores), "max": max(scores),
+                    "skill_ret": mean("skill_ret"), "skill_vol": mean("skill_vol"),
+                    "best": max(runs, key=lambda r: r["score"]), "runs": runs})
+    return sorted(out, key=lambda c: -c["mean"])
+
+
+def _made_by(r: dict) -> str:
+    job = r.get("job") if isinstance(r.get("job"), dict) else {}
+    if job.get("init_from"):
+        return f"prune {job.get('sparsity')} of {job['init_from']}"
+    return f"distilled from {job['teacher']}" if job.get("teacher") else "trained directly"
+
+
 def render(results: list[dict], eval_version: int | None = None) -> str:
     ok = [r for r in results if r.get("status") == "ok"
           and (eval_version is None or r.get("eval_version", 1) == eval_version)]
@@ -69,6 +130,22 @@ def render(results: list[dict], eval_version: int | None = None) -> str:
             lines += ["", f"## Top {t} runs", "",
                       "| Tier | Run | Score | Return skill | Vol skill | DM p (all) | Params | ONNX KB | CPU ms | Peak VRAM GB |",
                       "|---|---|---|---|---|---|---|---|---|---|"] + [row(r) for r in top]
+    confs = configurations(results, eval_version)
+    if confs:
+        lines += ["", "## Configurations by seed mean", "",
+                  "One row per configuration (same shape, training settings, teacher / parent) that ran with at",
+                  "least 2 different seeds, ranked by the mean over its seeds: the tables above rank single runs,",
+                  "and the best single run is the luckiest seed. A score difference smaller than the sd column is",
+                  "noise. Up to 10 per tier. Still selected on the validation folds, like everything here."]
+    for t in TIERS:
+        top = [c for c in confs if c["tier"] == t][:10]
+        if top:
+            lines += ["", f"### {t}", "",
+                      "| Mean score | sd | Seeds | Min | Max | Mean return skill | Mean vol skill | Best run | How it was made |",
+                      "|---|---|---|---|---|---|---|---|---|"]
+            lines += [f"| {c['mean']:+.4f} | {c['sd']:.4f} | {c['n']} | {c['min']:+.4f} | {c['max']:+.4f} "
+                      f"| {c['skill_ret']:+.4f} | {c['skill_vol']:+.4f} | {c['best']['id']} | {_made_by(c['best'])} |"
+                      for c in top]
     return "\n".join(lines) + "\n"
 
 

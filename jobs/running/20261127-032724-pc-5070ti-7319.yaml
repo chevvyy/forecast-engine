@@ -1,0 +1,18 @@
+tier: mid
+kind: distill
+teacher: 20261126-233941-pc-5070ti-ed9e
+model:
+  d_model: 64
+  dropout: 0.2
+  ffn: 2
+  kernel: 9
+  lookback: 256
+  n_blocks: 3
+  patch: 4
+  stride: 2
+note: distil into mid champion shape
+seed: 198927
+id: 20261127-032724-pc-5070ti-7319
+origin: worker
+worker: pc-5070ti
+attempts: 1

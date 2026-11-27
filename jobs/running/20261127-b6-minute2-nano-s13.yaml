@@ -5,3 +5,5 @@ config: loop_minute
 seed: 13
 note: third seed of the minute-2 nano preset (a6 +0.0256, a7 +0.0266)
 origin: planner
+worker: pc-5070ti
+attempts: 1

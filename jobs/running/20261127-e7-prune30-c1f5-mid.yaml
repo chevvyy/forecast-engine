@@ -8,5 +8,8 @@ train:
   max_epochs: 15
   batch_size: 2048
 seed: 11
-note: prune and finetune the new mid champion c1f5 at 30%, at its own batch size (finetune has no teacher)
+note: prune and finetune the new mid champion c1f5 at 30%, at its own batch size (finetune
+  has no teacher)
 origin: planner
+worker: pc-5070ti
+attempts: 1

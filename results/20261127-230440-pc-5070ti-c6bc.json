@@ -1,0 +1,144 @@
+{
+  "config": "loop",
+  "coverage_80": [
+    [
+      0.7944,
+      0.7962
+    ],
+    [
+      0.7912,
+      0.7845
+    ],
+    [
+      0.7985,
+      0.8033
+    ]
+  ],
+  "cpu_ms_per_forecast": 1.708,
+  "data_hash": "500294764fb3",
+  "device": "cuda",
+  "dm": {
+    "all": [
+      -11.218568127952029,
+      3.30579519963592e-29
+    ],
+    "ret": [
+      -5.825082600883019,
+      5.708435884794921e-09
+    ],
+    "vol": [
+      -12.699284225499696,
+      5.967297412840395e-37
+    ]
+  },
+  "eval_version": 2,
+  "finished": "2026-11-27T23:43:26+00:00",
+  "fits_tier": true,
+  "folds": [
+    {
+      "epochs": 8,
+      "es_pinball": 0.23328399658203125,
+      "n_train": 753990,
+      "n_val": 93975,
+      "peak_vram_gb": 6.313
+    },
+    {
+      "epochs": 20,
+      "es_pinball": 0.24041633307933807,
+      "n_train": 838233,
+      "n_val": 94394,
+      "peak_vram_gb": 6.327
+    },
+    {
+      "epochs": 15,
+      "es_pinball": 0.24391575157642365,
+      "n_train": 922663,
+      "n_val": 95360,
+      "peak_vram_gb": 6.339
+    }
+  ],
+  "git": "14b2f7a7",
+  "gpu": "NVIDIA GeForce RTX 5070 Ti",
+  "horizons": [
+    1,
+    5,
+    20
+  ],
+  "id": "20261127-230440-pc-5070ti-c6bc",
+  "job": {
+    "attempts": 1,
+    "id": "20261127-230440-pc-5070ti-c6bc",
+    "kind": "distill",
+    "model": {
+      "d_model": 384,
+      "dropout": 0.3,
+      "ffn": 2,
+      "kernel": 15,
+      "lookback": 256,
+      "n_blocks": 4,
+      "patch": 8,
+      "stride": 4
+    },
+    "note": "confirm champion 20261127-f3-large-distil-e1-s11: seed 2 of 3",
+    "origin": "worker",
+    "seed": 312845,
+    "teacher": "20261127-e1-mid-born-again-k15-s11",
+    "tier": "large",
+    "train": {
+      "batch_size": 2048,
+      "lr": 0.0003
+    },
+    "worker": "pc-5070ti"
+  },
+  "kind": "distill",
+  "minutes": 38.73,
+  "model": {
+    "d_model": 384,
+    "dropout": 0.3,
+    "ffn": 2,
+    "kernel": 15,
+    "lookback": 256,
+    "n_blocks": 4,
+    "patch": 8,
+    "stride": 4
+  },
+  "nonzero_params": 2450718,
+  "onnx_bytes": 9822780,
+  "onnx_max_abs_diff": 2.384185791015625e-07,
+  "params": 2450718,
+  "peak_vram_gb": 6.339,
+  "pinball": {
+    "ret_baseline": 0.3055918514728546,
+    "ret_model": 0.2997179627418518,
+    "vol_baseline": 0.19298601150512695,
+    "vol_har": 0.19298601150512695,
+    "vol_model": 0.1779409646987915,
+    "vol_unconditional": 0.20153072476387024
+  },
+  "rank_ic_h1": 0.010347381469314462,
+  "score": 0.04859030246734619,
+  "skill_ret": 0.019221365451812744,
+  "skill_vol": 0.07795923948287964,
+  "status": "ok",
+  "symbols": 539,
+  "tab": [
+    "log_rv5_rv20",
+    "log_rv60_rv20"
+  ],
+  "tier": "large",
+  "train": {
+    "batch_size": 2048,
+    "distill_alpha": 0.5,
+    "grad_clip": 1.0,
+    "lr": 0.0003,
+    "max_epochs": 40,
+    "patience": 5,
+    "weight_decay": 0.0001
+  },
+  "universe": {
+    "note": "current index members and megacaps: survivorship bias, return skill is optimistic",
+    "requested": 539
+  },
+  "vol_baseline": "har",
+  "worker": "pc-5070ti"
+}

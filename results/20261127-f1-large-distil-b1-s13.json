@@ -1,0 +1,144 @@
+{
+  "config": "loop",
+  "coverage_80": [
+    [
+      0.7966,
+      0.7988
+    ],
+    [
+      0.788,
+      0.7859
+    ],
+    [
+      0.7982,
+      0.8035
+    ]
+  ],
+  "cpu_ms_per_forecast": 1.766,
+  "data_hash": "500294764fb3",
+  "device": "cuda",
+  "dm": {
+    "all": [
+      -10.887973012985272,
+      1.3153525165811175e-27
+    ],
+    "ret": [
+      -4.932294842242492,
+      8.12691194750578e-07
+    ],
+    "vol": [
+      -12.067892570858008,
+      1.5608027678921863e-33
+    ]
+  },
+  "eval_version": 2,
+  "finished": "2026-11-27T21:04:00+00:00",
+  "fits_tier": true,
+  "folds": [
+    {
+      "epochs": 9,
+      "es_pinball": 0.23311670124530792,
+      "n_train": 753990,
+      "n_val": 93975,
+      "peak_vram_gb": 6.313
+    },
+    {
+      "epochs": 10,
+      "es_pinball": 0.24090713262557983,
+      "n_train": 838233,
+      "n_val": 94394,
+      "peak_vram_gb": 6.327
+    },
+    {
+      "epochs": 17,
+      "es_pinball": 0.24428434669971466,
+      "n_train": 922663,
+      "n_val": 95360,
+      "peak_vram_gb": 6.338
+    }
+  ],
+  "git": "fce1be48",
+  "gpu": "NVIDIA GeForce RTX 5070 Ti",
+  "horizons": [
+    1,
+    5,
+    20
+  ],
+  "id": "20261127-f1-large-distil-b1-s13",
+  "job": {
+    "attempts": 1,
+    "id": "20261127-f1-large-distil-b1-s13",
+    "kind": "distill",
+    "model": {
+      "d_model": 384,
+      "dropout": 0.3,
+      "ffn": 2,
+      "kernel": 15,
+      "lookback": 256,
+      "n_blocks": 4,
+      "patch": 8,
+      "stride": 4
+    },
+    "note": "third seed of the large champion's configuration (c6 shape distilled from mid b1: +0.0433 on seed 11, +0.0436 on a worker seed; without the teacher +0.020 over 4 seeds). Three seeds is the bar for calling it confirmed",
+    "origin": "planner",
+    "seed": 13,
+    "teacher": "20261127-b1-mid-k9-batch2048-lr0003-s12",
+    "tier": "large",
+    "train": {
+      "batch_size": 2048,
+      "lr": 0.0003
+    },
+    "worker": "pc-5070ti"
+  },
+  "kind": "distill",
+  "minutes": 32.75,
+  "model": {
+    "d_model": 384,
+    "dropout": 0.3,
+    "ffn": 2,
+    "kernel": 15,
+    "lookback": 256,
+    "n_blocks": 4,
+    "patch": 8,
+    "stride": 4
+  },
+  "nonzero_params": 2450718,
+  "onnx_bytes": 9822780,
+  "onnx_max_abs_diff": 3.5762786865234375e-07,
+  "params": 2450718,
+  "peak_vram_gb": 6.338,
+  "pinball": {
+    "ret_baseline": 0.3055918514728546,
+    "ret_model": 0.30099689960479736,
+    "vol_baseline": 0.19298601150512695,
+    "vol_har": 0.19298601150512695,
+    "vol_model": 0.17846718430519104,
+    "vol_unconditional": 0.20153072476387024
+  },
+  "rank_ic_h1": 0.008943446519086993,
+  "score": 0.045134395360946655,
+  "skill_ret": 0.015036225318908691,
+  "skill_vol": 0.07523256540298462,
+  "status": "ok",
+  "symbols": 539,
+  "tab": [
+    "log_rv5_rv20",
+    "log_rv60_rv20"
+  ],
+  "tier": "large",
+  "train": {
+    "batch_size": 2048,
+    "distill_alpha": 0.5,
+    "grad_clip": 1.0,
+    "lr": 0.0003,
+    "max_epochs": 40,
+    "patience": 5,
+    "weight_decay": 0.0001
+  },
+  "universe": {
+    "note": "current index members and megacaps: survivorship bias, return skill is optimistic",
+    "requested": 539
+  },
+  "vol_baseline": "har",
+  "worker": "pc-5070ti"
+}

@@ -14,6 +14,8 @@ model:
 train:
   lr: 0.0003
 seed: 11
-note: the same distil at lr 0.0003, where direct nano training is best (+0.043 over 3 seeds); compare
-  x3, same seed, +0.0435
+note: the same distil at lr 0.0003, where direct nano training is best (+0.043 over
+  3 seeds); compare x3, same seed, +0.0435
 origin: planner
+worker: pc-5070ti
+attempts: 1

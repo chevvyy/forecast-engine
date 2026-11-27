@@ -1,0 +1,144 @@
+{
+  "config": "loop_minute",
+  "coverage_80": [
+    [
+      0.7998,
+      0.8048
+    ],
+    [
+      0.7839,
+      0.7848
+    ],
+    [
+      0.7806,
+      0.7722
+    ],
+    [
+      0.7725,
+      0.7674
+    ]
+  ],
+  "cpu_ms_per_forecast": 0.145,
+  "data_hash": "b1f8ab268f40",
+  "device": "cuda",
+  "dm": {
+    "all": [
+      -4.690136284514793,
+      2.7302313943042355e-06
+    ],
+    "ret": [
+      -2.6189946698135715,
+      0.008818932547356838
+    ],
+    "vol": [
+      -4.721106618411451,
+      2.3456493480663594e-06
+    ]
+  },
+  "eval_version": "minute-2",
+  "finished": "2026-11-27T06:09:04+00:00",
+  "fits_tier": true,
+  "folds": [
+    {
+      "epochs": 7,
+      "es_pinball": 0.1937643140554428,
+      "n_train": 162930,
+      "n_val": 19410,
+      "peak_vram_gb": 0.456
+    },
+    {
+      "epochs": 7,
+      "es_pinball": 0.18281494081020355,
+      "n_train": 180400,
+      "n_val": 19410,
+      "peak_vram_gb": 0.458
+    },
+    {
+      "epochs": 8,
+      "es_pinball": 0.18288946151733398,
+      "n_train": 198340,
+      "n_val": 19410,
+      "peak_vram_gb": 0.458
+    }
+  ],
+  "git": "0b578c31",
+  "gpu": "NVIDIA GeForce RTX 5070 Ti",
+  "horizons": [
+    5,
+    15,
+    30,
+    60
+  ],
+  "id": "20261127-060827-pc-5070ti-5f02",
+  "job": {
+    "attempts": 1,
+    "config": "loop_minute",
+    "id": "20261127-060827-pc-5070ti-5f02",
+    "init_from": "20261127-a8-minute2-mid-s11",
+    "kind": "prune",
+    "note": "prune + finetune champion",
+    "origin": "worker",
+    "seed": 715958,
+    "sparsity": 0.7,
+    "tier": "mid",
+    "train": {
+      "lr": 0.0003,
+      "max_epochs": 15
+    },
+    "worker": "pc-5070ti"
+  },
+  "kind": "prune",
+  "minutes": 0.59,
+  "model": {
+    "d_model": 64,
+    "dropout": 0.2,
+    "ffn": 2,
+    "kernel": 25,
+    "lookback": 120,
+    "n_blocks": 3,
+    "patch": 4,
+    "stride": 2
+  },
+  "nonzero_params": 20554,
+  "onnx_bytes": 278565,
+  "onnx_max_abs_diff": 4.76837158203125e-07,
+  "params": 65512,
+  "peak_vram_gb": 0.458,
+  "pinball": {
+    "ret_baseline": 0.2933095097541809,
+    "ret_model": 0.29153501987457275,
+    "vol_baseline": 0.08988121896982193,
+    "vol_har": 0.0918901339173317,
+    "vol_har_tod": 0.08988121896982193,
+    "vol_model": 0.08702833950519562,
+    "vol_unconditional": 0.10149875283241272
+  },
+  "rank_ic_h1": -0.012973631211652849,
+  "score": 0.018895208835601807,
+  "skill_ret": 0.0060498714447021484,
+  "skill_vol": 0.031740546226501465,
+  "status": "ok",
+  "symbols": 10,
+  "tab": [
+    "log_rv5_rv20",
+    "log_rv60_rv20",
+    "tod",
+    "tod_u"
+  ],
+  "tier": "mid",
+  "train": {
+    "batch_size": 512,
+    "distill_alpha": 0.5,
+    "grad_clip": 1.0,
+    "lr": 0.0003,
+    "max_epochs": 15,
+    "patience": 5,
+    "weight_decay": 0.0001
+  },
+  "universe": {
+    "note": "10 liquid megacaps and index ETFs chosen by hand: survivorship bias, and nothing here says anything about less liquid names",
+    "requested": 10
+  },
+  "vol_baseline": "har_tod",
+  "worker": "pc-5070ti"
+}

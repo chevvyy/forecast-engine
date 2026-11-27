@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 import torch
 
 from forecast.data.sources import parse_yahoo_chart
@@ -103,3 +104,53 @@ def test_inference_batch_shrinks_for_wide_models_and_forecasts_do_not_change():
         np.zeros((300, len(TAB)), np.float32)
     a, b = predict(nano, x, tab, "cpu"), predict(nano, x, tab, "cpu", batch=64)
     assert a.shape == (300, 3, 2, 5) and np.allclose(a, b, atol=1e-5)
+
+
+def test_har_with_time_of_day_learns_the_session_shape_and_plain_har_never_sees_the_clock():
+    from forecast.models.baselines import HarRV, HarTod
+
+    rng = np.random.default_rng(0)
+    q = [0.1, 0.25, 0.5, 0.75, 0.9]
+
+    def make(n, lo=0.0, hi=1.0):
+        tod = rng.uniform(lo, hi, n).astype(np.float32)
+        tab = np.stack([rng.normal(size=n), rng.normal(size=n), tod, (2 * tod - 1) ** 2], axis=1).astype(np.float32)
+        y = np.zeros((n, 2, 2), np.float32)
+        y[:, :, 0] = rng.normal(size=(n, 2))
+        # log-vol: linear in the HAR columns plus a U over the session, deeper at the longer horizon
+        u = (2 * tod - 1) ** 2
+        y[:, 0, 1] = 0.5 * tab[:, 0] - 0.2 * tab[:, 1] + 1.0 * u + 0.1 * rng.normal(size=n)
+        y[:, 1, 1] = 0.3 * tab[:, 0] + 2.0 * u + 0.1 * rng.normal(size=n)
+        return {"tab": tab, "y": y}
+
+    tr, va = make(20000), make(5000)
+    har, hod = HarRV(q, 2), HarTod(q, tod_col=2, n_har=2)
+    har.fit(tr)
+    hod.fit(tr)
+    lh = pinball_rows(va["y"], har.predict(None, va["tab"]), q)[..., 1].mean()
+    lt = pinball_rows(va["y"], hod.predict(None, va["tab"]), q)[..., 1].mean()
+    assert lt < 0.5 * lh
+    # Plain HAR reads its own two columns only: the clock columns can hold anything.
+    scrambled = va["tab"].copy()
+    scrambled[:, 2:] = 99.0
+    np.testing.assert_array_equal(har.predict(None, va["tab"]), har.predict(None, scrambled))
+    # Returns stay the unconditional quantiles in both.
+    np.testing.assert_array_equal(hod.predict(None, va["tab"])[:, :, 0], har.predict(None, va["tab"])[:, :, 0])
+    # A time of day never seen in training (rows only from the first half of the session) still gives a
+    # finite forecast near the overall level, not zero and not an explosion.
+    half = make(5000, 0.0, 0.5)
+    hod2 = HarTod(q, tod_col=2, n_har=2)
+    hod2.fit(half)
+    late = make(200, 0.6, 1.0)
+    p = hod2.predict(None, late["tab"])[:, :, 1]
+    assert np.isfinite(p).all() and np.abs(p[:, 0, 2].mean() - half["y"][:, 0, 1].mean()) < 0.5
+
+
+def test_a_parent_from_before_the_clock_inputs_is_refused_with_a_clear_error():
+    from forecast.features.build import CHANNELS
+    from forecast.loop.run_job import _same_inputs
+
+    m = PatchNet(len(CHANNELS), 2, 3, 5, lookback=16, d_model=8, n_blocks=1, kernel=5)
+    assert _same_inputs(m, 2, "old") is m
+    with pytest.raises(ValueError, match="old was trained on 2 side inputs, this track has 4"):
+        _same_inputs(m, 4, "old")

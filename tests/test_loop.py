@@ -361,14 +361,21 @@ def test_minute_track_runs_from_its_own_config_and_never_competes_with_daily(tmp
     res = load_results(a)
     by = {r["id"]: r for r in res}
     assert by["min1"]["status"] == "ok", by["min1"].get("error")
-    assert by["min1"]["eval_version"] == "minute-1" and by["min1"]["config"] == "loop_minute"
+    mver = _minute_cfg()["eval"]["version"]
+    assert by["min1"]["eval_version"] == mver and by["min1"]["config"] == "loop_minute"
+    # The minute track has a clock: time-of-day inputs, and one more volatility baseline to beat.
+    pb = by["min1"]["pinball"]
+    assert by["min1"]["tab"][-2:] == ["tod", "tod_u"] and by["q1"]["tab"] == ["log_rv5_rv20", "log_rv60_rv20"]
+    assert pb["vol_baseline"] == min(pb["vol_unconditional"], pb["vol_har"], pb["vol_har_tod"])
+    assert by["min1"]["vol_baseline"] in ("unconditional", "har", "har_tod")
+    assert "vol_har_tod" not in by["q1"]["pinball"] and by["q1"]["vol_baseline"] in ("unconditional", "har")
     assert by["min1"]["horizons"] == [5, 15, 30, 60]
     daily_ver = load_cfg(a)["eval"]["version"]
     assert by["q1"]["eval_version"] == daily_ver and by["q1"]["config"] == "loop"
     assert all(r["eval_version"] == daily_ver for r in res if r["id"] != "min1")
-    assert champions(res, "minute-1")["nano"]["id"] == "min1"
+    assert champions(res, mver)["nano"]["id"] == "min1"
     assert champions(res, daily_ver)["nano"]["id"] != "min1"
-    assert "min1" not in render(res, daily_ver) and "min1" in render(res, "minute-1")
+    assert "min1" not in render(res, daily_ver) and "min1" in render(res, mver)
     # Jobs naming a config that is not a plain file in configs/ are left alone, and the worker carries on.
     assert sorted(p.stem for p in q.glob("*.yaml")) == ["bad1", "bad2"]
 

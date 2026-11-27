@@ -2,7 +2,8 @@
 # (jobs/README.md); workers never invent minute jobs on their own. Its scores live under their own
 # eval.version, so they never compete with the daily track (configs/loop.yaml), and on their own board:
 #   python -m forecast.loop.leaderboard --config loop_minute   ->  experiments/LEADERBOARD_minute.md
-# Status 2026-11-26: run on synthetic sessions only. Nothing here has met real minute bars yet.
+# Status 2026-11-26: two runs on real Alpaca minute bars under minute-1 (y8, z8). minute-2 adds the time of
+# day as a model input and a volatility baseline that knows it; no minute-2 run on real bars yet.
 branch: loop
 
 data:
@@ -23,7 +24,11 @@ task:
   max_lookback: 120
 
 eval:
-  version: minute-1        # never a number: daily versions are numbers, so the two tracks cannot collide
+  # Never a number: daily versions are numbers, so the two tracks cannot collide.
+  # minute-2 (2026-11-26): volatility is scored against the best of unconditional, HAR and HAR with a
+  # time-of-day level (models/baselines.py HarTod), and rows carry the time of day as a model input.
+  # minute-1: unconditional and HAR only, no clock anywhere (2 runs, closed).
+  version: minute-2
   holdout_frac: 0.08       # most recent slice; no loop job may ever build rows from it
   n_folds: 3
   val_frac: 0.08

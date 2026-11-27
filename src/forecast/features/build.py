@@ -16,8 +16,13 @@ does not directly follow the previous one (session open, or after a hole), its r
 instead of close-to-close and its gap channel is 0, so the overnight move enters nothing. The trailing
 statistics (rv20 scale, volume z-score, HAR regressors) do run across sessions, on those intraday
 returns only: a session is too short to warm them up from scratch, and they are trailing, so causal.
-Known gaps: no time-of-day feature, and horizons are counted in bars (the grid rule makes that equal to
-clock time).
+Intraday rows also carry the time of day (``TAB_TOD``, appended to ``tab``): where in the regular New York
+session the forecast is made, taken from the clock at ``known`` and nothing else. Volatility has a
+strong shape over the session (high at the open, low at midday, rising into the close), so a model or
+a baseline without the clock cannot tell a quiet lunch hour from a calm market. Daily rows have no such
+columns: the daily ``tab`` and everything computed from it are unchanged.
+Known gaps: the session is assumed to be 09:30-16:00 New York (on a half-day the time of day does not
+know the early close), and horizons are counted in bars (the grid rule makes that equal to clock time).
 """
 from __future__ import annotations
 
@@ -30,6 +35,8 @@ from forecast.utils.common import DAY
 
 CHANNELS = ["ret", "abs_ret", "range", "vol_z", "mkt_ret", "gap"]
 TAB = ["log_rv5_rv20", "log_rv60_rv20"]  # HAR-style regressors for the baseline
+TAB_TOD = ["tod", "tod_u"]  # intraday only: share of the session elapsed, and its U-shape (2 tod - 1)^2
+SESSION_OPEN, SESSION_SECONDS = 9 * 3600 + 30 * 60, 23400   # regular New York session, 09:30-16:00
 WARMUP = 60
 EPS = 1e-8
 
@@ -41,6 +48,16 @@ def grid_runs(tsec: np.ndarray, bar_seconds: int) -> np.ndarray:
     brk[1:] = np.diff(tsec) != bar_seconds
     pos = np.arange(len(tsec))
     return pos - np.maximum.accumulate(np.where(brk, pos, 0)) + 1
+
+
+def time_of_day(known: np.ndarray) -> np.ndarray:
+    """Share of the regular New York session elapsed at epoch second ``known``, in [0, 1].
+    A function of the clock alone (daylight saving included), so it cannot carry anything from a bar."""
+    ny = pl.Series("t", np.asarray(known, dtype=np.int64) * 1_000_000).cast(pl.Datetime("us", "UTC"))
+    ny = ny.dt.convert_time_zone("America/New_York")
+    sec = (ny.dt.hour().cast(pl.Int64) * 3600 + ny.dt.minute().cast(pl.Int64) * 60
+           + ny.dt.second().cast(pl.Int64)).to_numpy()
+    return np.clip((sec - SESSION_OPEN) / SESSION_SECONDS, 0.0, 1.0)
 
 
 class Windows:
@@ -95,7 +112,7 @@ class Windows:
 @dataclass
 class Dataset:
     X: Windows           # [n, C, L] float32 channel windows ending at bar i, built on demand
-    tab: np.ndarray      # [n, len(TAB)] float32
+    tab: np.ndarray      # [n, len(tab_names)] float32: TAB, then TAB_TOD on intraday bars
     y: np.ndarray        # [n, H, 2] float32
     t: np.ndarray        # [n] int64 epoch seconds of bar i
     t_end: np.ndarray    # [n] int64 epoch seconds of the last bar any label of row i touches
@@ -104,6 +121,7 @@ class Dataset:
     symbols: list[str]
     horizons: list[int]
     known: np.ndarray | None = None  # [n] int64 epoch seconds from which row i may be used: t + one bar
+    tab_names: tuple[str, ...] = tuple(TAB)
 
 
 def _roll_mean(a: np.ndarray, w: int) -> np.ndarray:
@@ -207,6 +225,12 @@ def build(bars: pl.DataFrame, horizons: list[int], lookback: int, benchmark: str
     X = Windows(np.concatenate(chs), np.concatenate(ends).astype(np.int64), lookback)
     t = np.concatenate(ts)
     # A daily bar's stamp is its date or session open, so "one day later" is a safe time for its close.
-    return Dataset(X, np.concatenate(tabs), np.concatenate(ys), t,
+    known = t + (bar_seconds or DAY)
+    tab, names = np.concatenate(tabs), tuple(TAB)
+    if intraday:  # the clock at the moment the row becomes usable; see the module docstring
+        tod = time_of_day(known)
+        tab = np.concatenate([tab, np.stack([tod, (2.0 * tod - 1.0) ** 2], axis=1).astype(np.float32)], axis=1)
+        names = (*TAB, *TAB_TOD)
+    return Dataset(X, tab, np.concatenate(ys), t,
                    np.concatenate(tes), np.concatenate(syms), np.concatenate(scs), symbols, list(horizons),
-                   known=t + (bar_seconds or DAY))
+                   known=known, tab_names=names)

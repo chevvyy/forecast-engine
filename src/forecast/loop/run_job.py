@@ -22,8 +22,8 @@ import yaml
 from forecast.data.sources import load_bars, resolve_symbols
 from forecast.evaluation import metrics as M
 from forecast.evaluation.splits import holdout_start, walk_forward
-from forecast.features.build import CHANNELS, TAB, Dataset, build
-from forecast.models.baselines import HarRV, Unconditional
+from forecast.features.build import CHANNELS, TAB, TAB_TOD, Dataset, build
+from forecast.models.baselines import HarRV, HarTod, Unconditional
 from forecast.models.patchnet import PatchNet, n_params
 from forecast.serving.export import export_onnx
 from forecast.training.compress import magnitude_masks, nonzero_params
@@ -65,6 +65,14 @@ def save_model(model: PatchNet, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     state = {k: (v.half() if v.is_floating_point() else v) for k, v in model.state_dict().items()}
     torch.save({"cfg": model.cfg, "state": state}, path)
+
+
+def _same_inputs(model: PatchNet, n_tab: int, run_id: str) -> PatchNet:
+    """A parent or teacher from before a track gained side inputs (minute-1 has no time of day) cannot be
+    fed this track's rows: say so instead of failing inside a matrix product."""
+    if model.cfg["n_tab"] != n_tab:
+        raise ValueError(f"{run_id} was trained on {model.cfg['n_tab']} side inputs, this track has {n_tab}")
+    return model
 
 
 def _slice(ds: Dataset, idx: np.ndarray) -> dict:
@@ -133,26 +141,29 @@ def run_job(job: dict, cfg: dict | None = None, repo: Path = REPO, device: str |
         res["universe"] = {"requested": len(resolve_symbols(cfg["data"])),
                            "note": cfg["data"].get("universe_note")}
         ds, folds, dhash = prepare(cfg, lookback)
+        n_tab = ds.tab.shape[1]
+        # Intraday tracks have a clock: one more volatility baseline, HAR with a time-of-day level.
+        tod_col = ds.tab_names.index(TAB_TOD[0]) if TAB_TOD[0] in ds.tab_names else None
         out_dir = repo / "artifacts" / job["id"]
         if out_dir.exists():
             shutil.rmtree(out_dir)
         budget = float(job.get("max_minutes", tier["max_minutes"])) * 60.0
         per_fold = budget / len(folds)
-        L_model, L_unc, L_har, T_all, cov, ics, stats = [], [], [], [], [], [], []
+        L_model, L_unc, L_har, L_tod, T_all, cov, ics, stats = [], [], [], [], [], [], [], []
         model = None
         for k, f in enumerate(folds):
             tr, es, va = _slice(ds, f.train), _slice(ds, f.es), _slice(ds, f.val)
             fit_all = {key: np.concatenate([tr[key], es[key]]) for key in ("tab", "y")}  # baselines ignore X
-            unc, har = Unconditional(Q), HarRV(Q)
+            unc, har = Unconditional(Q), HarRV(Q, len(TAB))
             unc.fit(fit_all)
             har.fit(fit_all)
             if init_dir is not None:
-                model = load_model(init_dir / f"fold{k}.pt")
+                model = _same_inputs(load_model(init_dir / f"fold{k}.pt"), n_tab, job["init_from"])
             else:
-                model = PatchNet(len(CHANNELS), len(TAB), len(ds.horizons), len(Q), **mcfg)
+                model = PatchNet(len(CHANNELS), n_tab, len(ds.horizons), len(Q), **mcfg)
             teacher_pred = None
             if teacher_dir is not None:
-                teacher = load_model(teacher_dir / f"fold{k}.pt").to(device)
+                teacher = _same_inputs(load_model(teacher_dir / f"fold{k}.pt"), n_tab, job["teacher"]).to(device)
                 teacher_pred = predict(teacher, tr["X"], tr["tab"], device)
                 del teacher
             masks = None
@@ -164,26 +175,34 @@ def run_job(job: dict, cfg: dict | None = None, repo: Path = REPO, device: str |
             L_model.append(M.pinball_rows(va["y"], pv, Q))
             L_unc.append(M.pinball_rows(va["y"], unc.predict(va["X"], va["tab"]), Q))
             L_har.append(M.pinball_rows(va["y"], har.predict(va["X"], va["tab"]), Q))
+            if tod_col is not None:
+                hod = HarTod(Q, tod_col, n_har=len(TAB))
+                hod.fit(fit_all)
+                L_tod.append(M.pinball_rows(va["y"], hod.predict(va["X"], va["tab"]), Q))
             T_all.append(ds.t[f.val])
             cov.append(M.coverage(va["y"], pv))
             ics.append(M.rank_ic(va["y"][:, 0, 0], pv[:, 0, 0, len(Q) // 2], ds.t[f.val]))
             stats.append({**st, "n_train": int(len(f.train)), "n_val": int(len(f.val))})
             save_model(model, out_dir / f"fold{k}.pt")
         lm, lu, lh, tt = (np.concatenate(a) for a in (L_model, L_unc, L_har, T_all))
+        # Volatility is scored against the best baseline there is: the one with the lowest mean loss.
+        vol_bases = {"vol_unconditional": lu[..., 1], "vol_har": lh[..., 1]}
+        if L_tod:
+            vol_bases["vol_har_tod"] = np.concatenate(L_tod)[..., 1]
+        vol_best = min(vol_bases, key=lambda name: (vol_bases[name].mean(), name != "vol_har"))
         ret_m, ret_b = lm[..., 0].mean(), lu[..., 0].mean()
-        vol_m, vol_b = lm[..., 1].mean(), min(lu[..., 1].mean(), lh[..., 1].mean())
+        vol_m, vol_b = lm[..., 1].mean(), vol_bases[vol_best].mean()
         if not np.isfinite([ret_m, ret_b, vol_m, vol_b]).all():
             # A diverged model is a failed run, not a score (a NaN score could never be beaten or ranked).
             raise FloatingPointError(f"non-finite loss (ret {ret_m}, vol {vol_m}): the model diverged")
-        best_base = np.stack([lu[..., 0], np.where(lh[..., 1].mean() <= lu[..., 1].mean(), lh[..., 1], lu[..., 1])],
-                             axis=-1)
+        best_base = np.stack([lu[..., 0], vol_bases[vol_best]], axis=-1)
         # Newey-West lag in forecast timestamps: labels overlap for max(horizons) - 1 bars. A config may
         # ask for more (minute bars: a whole session, since losses within one day move together).
         hmax = int(cfg["eval"].get("dm_lag", max(ds.horizons)))
         dm_all = M.diebold_mariano(lm.mean((1, 2)), best_base.mean((1, 2)), tt, lag=hmax)
         dm_ret = M.diebold_mariano(lm[..., 0].mean(1), best_base[..., 0].mean(1), tt, lag=hmax)
         dm_vol = M.diebold_mariano(lm[..., 1].mean(1), best_base[..., 1].mean(1), tt, lag=hmax)
-        onnx = export_onnx(model, out_dir / "model.onnx", len(TAB))
+        onnx = export_onnx(model, out_dir / "model.onnx", n_tab)
         model.to("cpu")
         peak = max(s["peak_vram_gb"] for s in stats)
         res.update({
@@ -191,7 +210,8 @@ def run_job(job: dict, cfg: dict | None = None, repo: Path = REPO, device: str |
             "symbols": len(ds.symbols), "horizons": ds.horizons, "folds": stats,
             "pinball": {"ret_model": float(ret_m), "ret_baseline": float(ret_b),
                         "vol_model": float(vol_m), "vol_baseline": float(vol_b),
-                        "vol_har": float(lh[..., 1].mean()), "vol_unconditional": float(lu[..., 1].mean())},
+                        **{name: float(loss.mean()) for name, loss in sorted(vol_bases.items())}},
+            "vol_baseline": vol_best.removeprefix("vol_"), "tab": list(ds.tab_names),
             "skill_ret": float(1 - ret_m / ret_b), "skill_vol": float(1 - vol_m / vol_b),
             "score": float(0.5 * (1 - ret_m / ret_b) + 0.5 * (1 - vol_m / vol_b)),
             "dm": {"all": dm_all, "ret": dm_ret, "vol": dm_vol},

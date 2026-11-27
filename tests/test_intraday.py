@@ -6,7 +6,7 @@ import yaml
 
 from forecast.data.sources import synthetic
 from forecast.evaluation.splits import holdout_start, walk_forward
-from forecast.features.build import build, grid_runs
+from forecast.features.build import TAB, TAB_TOD, build, grid_runs, time_of_day
 from forecast.loop.run_job import bar_seconds, run_job
 from forecast.utils.common import REPO, interval_seconds
 
@@ -142,3 +142,41 @@ def test_job_runs_end_to_end_on_intraday_bars(tmp_path):
     res = run_job({"id": "intra", "tier": "nano", "seed": 1}, cfg, repo=tmp_path, device="cpu")
     assert res["status"] == "ok", res.get("traceback")
     assert res["horizons"] == H and np.isfinite(res["score"])
+
+
+@pytest.mark.leakage
+def test_time_of_day_comes_from_the_clock_alone():
+    """The time-of-day inputs are a function of the moment a row becomes usable (``known``) and of
+    nothing in any bar: replacing every price and volume leaves them bit-identical."""
+    bars = _bars()
+    rng = np.random.default_rng(0)
+    other = bars.with_columns([(pl.col(c) * pl.Series(rng.uniform(0.5, 2.0, bars.height))).alias(c)
+                               for c in [*PRICE, "volume"]])
+    a, b = build(bars, H, L, bar_seconds=BAR), build(other, H, L, bar_seconds=BAR)
+    assert a.tab_names == (*TAB, *TAB_TOD) and a.tab.shape[1] == len(TAB) + len(TAB_TOD)
+    np.testing.assert_array_equal(a.t, b.t)
+    k = len(TAB)
+    np.testing.assert_array_equal(a.tab[:, k:], b.tab[:, k:])
+    assert not np.array_equal(a.tab[:, :k], b.tab[:, :k])          # the HAR columns did change
+    tod = time_of_day(a.known)
+    np.testing.assert_array_equal(a.tab[:, k], tod.astype(np.float32))
+    np.testing.assert_allclose(a.tab[:, k + 1], (2 * tod - 1) ** 2, atol=1e-6)
+    # Synthetic sessions run 14:30-21:00 UTC in January = 09:30-16:00 New York. A row's window is
+    # at least L bars into the session and its label ends before the close.
+    assert tod.min() == pytest.approx(L * BAR / 23400) and tod.max() == pytest.approx(1 - max(H) * BAR / 23400)
+
+
+def test_time_of_day_follows_new_york_through_daylight_saving():
+    from datetime import UTC, datetime
+
+    def at(*a):
+        return int(datetime(*a, tzinfo=UTC).timestamp())
+
+    summer, winter = at(2026, 7, 1, 15, 30), at(2026, 11, 10, 16, 30)      # both 11:30 in New York
+    tod = time_of_day(np.array([summer, winter, at(2026, 7, 1, 13, 30), at(2026, 7, 1, 20, 0), at(2026, 7, 1, 10, 0)]))
+    np.testing.assert_allclose(tod, [2 / 6.5, 2 / 6.5, 0.0, 1.0, 0.0])   # .., open, close, 06:00 (clipped)
+
+
+def test_daily_rows_have_no_clock_columns():
+    ds = build(synthetic(["SPY", "AAA"], 300, seed=2), [1, 5], 32)
+    assert ds.tab_names == tuple(TAB) and ds.tab.shape[1] == len(TAB)

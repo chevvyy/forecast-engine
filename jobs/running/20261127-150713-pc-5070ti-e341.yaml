@@ -1,0 +1,13 @@
+tier: mid
+kind: prune
+init_from: 20261127-d4-mid-born-again-b1-s11
+sparsity: 0.85
+train:
+  lr: 0.0003
+  max_epochs: 15
+note: prune + finetune champion
+seed: 233590
+id: 20261127-150713-pc-5070ti-e341
+origin: worker
+worker: pc-5070ti
+attempts: 1

@@ -16,3 +16,5 @@ seed: 11
 note: batch 2048 removed the negative return skill in nano and mid; same test on the
   confirmed large shape. compare with z3 (same seed, batch 512)
 origin: planner
+worker: pc-5070ti
+attempts: 1

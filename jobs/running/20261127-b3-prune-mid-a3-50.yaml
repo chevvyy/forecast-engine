@@ -3,7 +3,12 @@ tier: mid
 kind: prune
 init_from: 20261127-a3-mid-k9-batch2048-lr0003-s11
 sparsity: 0.5
-train: {lr: 0.0003, max_epochs: 15, batch_size: 2048}
+train:
+  lr: 0.0003
+  max_epochs: 15
+  batch_size: 2048
 seed: 11
 note: prune-and-finetune the mid champion a3 at 50% (finetuned at its own batch size)
 origin: planner
+worker: pc-5070ti
+attempts: 1

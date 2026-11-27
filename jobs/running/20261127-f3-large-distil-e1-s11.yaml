@@ -15,6 +15,9 @@ train:
   batch_size: 2048
   lr: 0.0003
 seed: 11
-note: 'the large champion''s shape with e1 as teacher instead of b1 (same seed as e6, +0.0433): e1''s
-  configuration scores 0.006 above b1''s. Tests ''the student follows its teacher''s score'''
+note: 'the large champion''s shape with e1 as teacher instead of b1 (same seed as
+  e6, +0.0433): e1''s configuration scores 0.006 above b1''s. Tests ''the student
+  follows its teacher''s score'''
 origin: planner
+worker: pc-5070ti
+attempts: 1

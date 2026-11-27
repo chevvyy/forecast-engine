@@ -5,3 +5,5 @@ config: loop_minute
 seed: 12
 note: second seed of a6 (minute-2)
 origin: planner
+worker: pc-5070ti
+attempts: 1

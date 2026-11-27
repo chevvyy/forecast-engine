@@ -1,0 +1,12 @@
+id: 20261127-e5-minute2-mid-born-again-a8-s11
+tier: mid
+config: loop_minute
+kind: distill
+teacher: 20261127-a8-minute2-mid-s11
+seed: 11
+note: 'minute mid preset distilled from a8, which is the same shape (a8 itself: +0.0298
+  on this seed, preset +0.026 over 3). Does the soft-target gain seen on daily mid
+  (d4) carry over?'
+origin: planner
+worker: pc-5070ti
+attempts: 1

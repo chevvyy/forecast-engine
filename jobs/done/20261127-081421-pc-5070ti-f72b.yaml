@@ -1,0 +1,20 @@
+tier: nano
+kind: train
+model:
+  d_model: 24
+  dropout: 0.1
+  ffn: 2
+  kernel: 51
+  lookback: 60
+  n_blocks: 2
+  patch: 4
+  stride: 2
+train:
+  weight_decay: 0.01
+note: mutation of 20261127-a7-minute2-nano-s12
+seed: 660619
+id: 20261127-081421-pc-5070ti-f72b
+origin: worker
+config: loop_minute
+worker: pc-5070ti
+attempts: 1

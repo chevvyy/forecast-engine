@@ -8,6 +8,8 @@ train:
   max_epochs: 15
   batch_size: 2048
 seed: 11
-note: prune and finetune the new large champion c6 at 50%, at its own batch size; 85% prunes by the worker
-  at batch 512 scored +0.0080 and +0.0117
+note: prune and finetune the new large champion c6 at 50%, at its own batch size;
+  85% prunes by the worker at batch 512 scored +0.0080 and +0.0117
 origin: planner
+worker: pc-5070ti
+attempts: 1

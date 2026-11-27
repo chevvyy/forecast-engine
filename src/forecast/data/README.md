@@ -4,7 +4,9 @@ Build this first. Nothing downstream is trustworthy until these tests pass.
 
 ## What exists
 `sources.py` (synthetic, keyless Yahoo, symbol lists) and `alpaca.py` (minute-bar ingestor: raw
-per-symbol-month parquet, resumable, adjusted on load). The table below is the fuller plan.
+per-symbol-month parquet, resumable, adjusted on load) and `calendar.py` (early closes only, as a table
+of dates: the 210-minute session and the time of day on such a day; no holiday list, no minute grid).
+The table below is the fuller plan.
 
 ## Files to create
 | File | Responsibility |

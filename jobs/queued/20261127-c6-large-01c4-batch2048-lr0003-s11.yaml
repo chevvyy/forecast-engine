@@ -1,0 +1,19 @@
+id: 20261127-c6-large-01c4-batch2048-lr0003-s11
+tier: large
+kind: train
+model:
+  lookback: 256
+  patch: 8
+  stride: 4
+  d_model: 384
+  n_blocks: 4
+  kernel: 15
+  ffn: 2
+  dropout: 0.3
+train:
+  batch_size: 2048
+  lr: 0.0003
+seed: 11
+note: the recipe that lifted nano and mid (batch 2048 with lr 0.0003) on the confirmed large shape 01c4;
+  batch 2048 alone did not help (a4 +0.0114), lr 0.0003 alone untested on this shape
+origin: planner

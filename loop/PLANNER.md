@@ -49,8 +49,9 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
    and are not the `teacher` / `init_from` of a job still in `jobs/queued/`.
    Champion and runner-up are per track and version (daily, minute, and the closed version 1). Also keep
    the first run of a configuration the log calls confirmed across seeds, while it is the confirmed
-   one for its tier (since 2026-11-26 21:15: nano `20261126-x3-nano-champ-lr0003-s11`, mid
-   `20261126-z7-mid-k9-batch2048-s11`, large `20261126-190159-pc-5070ti-01c4`).
+   one for its tier (since 2026-11-27 01:10: nano `20261126-x3-nano-champ-lr0003-s11`, mid
+   `20261127-a3-mid-k9-batch2048-lr0003-s11`, large `20261126-190159-pc-5070ti-01c4`; minute-2: nano
+   `20261127-a6-minute2-nano-s11`, mid `20261127-a8-minute2-mid-s11`).
    Keep `jobs/done/` and `results/` (they are the experiment record).
 7. **Push** to `loop`. If the push is rejected, `git pull --rebase` and retry; never force-push.
 8. **Tell Dev only when it matters:** a worker down > 6 h, the loop blocked on something only he can
@@ -203,8 +204,23 @@ Minute track: `minute-1` = unconditional and HAR baselines, no clock (2 runs, cl
       every run names `har_tod` as its volatility baseline. Against it nano scores +0.0256 / +0.0266
       (vol +0.048, minute-1 had +0.062 against plain HAR: about a quarter of that was the clock), mid
       +0.0298 on one seed. Same data hash b1f8ab268f40;
-      (3) exchange calendar for
-      half-days; (4) out-of-core windows before the symbol list grows; (5) results net of a per-trade
+      (3) [x] exchange calendar for half-days (done 2026-11-27 01:10): `forecast.data.calendar` holds the
+      early closes 2016-2028 as a table (2026-2028 from the NYSE Group calendar announced 2025-12-23;
+      2016-2025 from memory, unchecked, and loaded by no minute track). On such a day
+      `alpaca.regular_session` keeps 09:30-13:00 only (210 bars), when bars are fetched and again on
+      load, so a month stored earlier loses its late-session bars too, and `time_of_day` is the share of
+      that day's own session. Published in advance, so not look-ahead (leakage test). The minute-2 window
+      (2026-06-01 to 2026-11-25) contains NO early close (2026-07-02 was a full day; the first one is
+      2026-11-27, after the pin), so no bar and no input changes: no version bump, a test
+      (`tests/test_calendar.py`) fails if a minute config's window ever contains one under `minute-2`, and
+      the CPU dry run on synthetic sessions is bit-identical before and after. Whoever moves the minute
+      `data.end` past 2026-11-27 bumps the version anyway (pin rule). **Next cycle must check on the real
+      machine:** minute results with `finished` after 2026-11-27 08:40 UTC (c7 is one) still report
+      `data_hash` b1f8ab268f40 and the same rows per fold (19,410 validation). If the hash differs, the
+      stored bars held something the calendar now drops, which I did not expect: bump to `minute-3`
+      and say so. Not covered: unscheduled closures, and dates after 2028 (treated as full days; the
+      test keeps the pins inside the table);
+      (4) out-of-core windows before the symbol list grows; (5) results net of a per-trade
       cost (docs/EVALUATION.md section 4). That last one needs a backtest of a simple rule, which the
       loop's standing rules exclude (no trading code), so it waits for Dev to say what he wants there.
       Can also be tried on Yahoo `1h`/`5m` (keyless stopgaps: ~730 and ~60 days; note Yahoo `5m` needs

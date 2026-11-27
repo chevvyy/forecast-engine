@@ -1,0 +1,19 @@
+id: 20261127-c3-distil-b1-nano-lr0003-s11
+tier: nano
+kind: distill
+teacher: 20261127-b1-mid-k9-batch2048-lr0003-s12
+model:
+  lookback: 256
+  patch: 4
+  stride: 2
+  d_model: 32
+  n_blocks: 3
+  kernel: 25
+  ffn: 2
+  dropout: 0.2
+train:
+  lr: 0.0003
+seed: 11
+note: the same distil at lr 0.0003, where direct nano training is best (+0.043 over 3 seeds); compare
+  x3, same seed, +0.0435
+origin: planner

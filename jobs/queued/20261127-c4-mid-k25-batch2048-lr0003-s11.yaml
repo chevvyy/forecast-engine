@@ -1,0 +1,19 @@
+id: 20261127-c4-mid-k25-batch2048-lr0003-s11
+tier: mid
+kind: train
+model:
+  lookback: 256
+  patch: 4
+  stride: 2
+  d_model: 64
+  n_blocks: 3
+  kernel: 25
+  ffn: 2
+  dropout: 0.2
+train:
+  batch_size: 2048
+  lr: 0.0003
+seed: 11
+note: does kernel 9 still matter under the confirmed mid recipe (batch 2048, lr 0.0003)? compare a3, same
+  seed, +0.0356
+origin: planner

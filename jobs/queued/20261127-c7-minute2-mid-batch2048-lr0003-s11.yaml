@@ -1,0 +1,11 @@
+id: 20261127-c7-minute2-mid-batch2048-lr0003-s11
+tier: mid
+config: loop_minute
+kind: train
+train:
+  batch_size: 2048
+  lr: 0.0003
+seed: 11
+note: 'minute-2 mid preset with the daily mid recipe; compare a8, same seed, +0.0298. Also the first minute
+  job after the exchange calendar: data_hash must still be b1f8ab268f40'
+origin: planner

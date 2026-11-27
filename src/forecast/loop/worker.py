@@ -155,6 +155,55 @@ def recipe(champ: dict, results: list[dict], cfg: dict, repo: Path = REPO) -> di
     return out
 
 
+# A tier's champion is the best single run, so it is also the luckiest seed of everything tried. Before
+# the worker mutates it, its configuration is run until it has this many seeds (``search.confirm_seeds``
+# overrides; 1 switches the re-runs off). Same number as ``MAX_REPEATS`` on purpose.
+CONFIRM_SEEDS = 3
+
+
+def _number(v: object) -> bool:
+    return isinstance(v, int | float) and not isinstance(v, bool) and v == v and abs(v) != float("inf")
+
+
+def rerun(champ: dict, results: list[dict], cfg: dict, repo: Path = REPO) -> dict | None:
+    """The champion's own job again, without a seed: same tier, shape, training settings, teacher, parent
+    and sparsity, so that its ``signature`` (and the leaderboard's configuration) is the champion's.
+
+    Results are worker-written data, so the job is rebuilt field by field: ``model`` and ``train`` may
+    only hold numbers under keys the tier preset / the train defaults already have, a teacher or parent
+    must be a finished run of this ``eval.version`` whose checkpoints are on this machine, and a sparsity
+    must lie inside (0, 1). Anything else returns None: the champion is then not re-run here (another
+    machine, or the planner, may still do it) and the worker goes on to its usual proposals."""
+    job = champ.get("job")
+    tier = champ.get("tier")
+    if not isinstance(job, dict) or tier not in cfg["tiers"]:
+        return None
+    ver = cfg["eval"].get("version", 1)
+    ok = {r["id"] for r in results if isinstance(r, dict) and isinstance(r.get("id"), str)
+          and r.get("status") == "ok" and r.get("eval_version", 1) == ver}
+    kind = job.get("kind", "train")
+    out: dict = {"tier": tier, "kind": kind if kind in ("train", "distill", "prune") else "train"}
+    for key, known in (("model", cfg["tiers"][tier]["model"]), ("train", cfg["train"])):
+        part = job.get(key)
+        if part is None:
+            continue
+        if not isinstance(part, dict) or any(k not in known or not _number(v) for k, v in part.items()):
+            return None
+        out[key] = dict(part)
+    for key in ("teacher", "init_from"):
+        ref = job.get(key)
+        if ref is None:
+            continue
+        if not isinstance(ref, str) or ref not in ok or not artifact_dir(ref, repo):
+            return None
+        out[key] = ref
+    if job.get("sparsity") is not None:
+        if not _number(job["sparsity"]) or not 0.0 < job["sparsity"] < 1.0:
+            return None
+        out["sparsity"] = float(job["sparsity"])
+    return out
+
+
 def _with_recipe(job: dict, rec: dict) -> dict:
     """A job trained the way the champion was: with its teacher, if it had one."""
     if rec.get("teacher"):
@@ -193,7 +242,12 @@ def _draw(cfg: dict, ch: dict, tier: str, done: int, rng: random.Random, repo: P
 
 
 def propose(cfg: dict, results: list[dict], tiers: list[str], rng: random.Random, repo: Path = REPO) -> dict:
-    """Invent the next experiment: mutate the tier champion (keeping how it was trained, see
+    """Invent the next experiment. First of all, a champion whose configuration has fewer than
+    ``CONFIRM_SEEDS`` seeds is run again with a new seed (``rerun``): a champion is the best of many
+    single runs, and until 2026-11-27 the worker mutated it for hours before the planner's seed re-runs
+    said whether it was a step or a lucky draw. Failed runs count as seeds tried, so a configuration that
+    cannot be re-run is given up after the same number of attempts. Otherwise:
+    mutate the tier champion (keeping how it was trained, see
     ``recipe``), or distil a bigger champion into a smaller tier, or prune-and-finetune the champion.
     Every proposal carries a seed. A proposal is
     dropped and redrawn if the same job already has a result, if it is a distil / prune configuration
@@ -205,9 +259,9 @@ def propose(cfg: dict, results: list[dict], tiers: list[str], rng: random.Random
     missing = [t for t in tiers if t not in ch]
     if missing:
         return {"tier": missing[0], "kind": "train", "note": "tier preset (first run)"}
-    tier = rng.choice(tiers)
     exact: set[str] = set()
     repeats: dict[str, int] = {}
+    seeds: dict[str, set[int]] = {}
     for r in results:
         if r.get("eval_version", 1) != ver:
             continue
@@ -217,6 +271,24 @@ def propose(cfg: dict, results: list[dict], tiers: list[str], rng: random.Random
         except (KeyError, TypeError, ValueError):
             continue   # results are worker-written data: skip anything malformed
         repeats[key] = repeats.get(key, 0) + 1
+        seeds.setdefault(key, set()).add(int(r["job"].get("seed", 1337)))
+    try:
+        need = int((cfg.get("search") or {}).get("confirm_seeds", CONFIRM_SEEDS))
+    except (TypeError, ValueError):
+        need = CONFIRM_SEEDS
+    pending = []
+    for t in tiers:
+        again = rerun(ch[t], results, cfg, repo)
+        if again is not None and fits_vram(again, cfg):
+            tried = seeds.get(signature(again, cfg, seed=False), set())
+            if len(tried) < need:
+                pending.append((again, tried, ch[t]["id"]))
+    if pending:
+        job, tried, champ_id = rng.choice(pending)
+        job["seed"] = rng.choice([s for s in rng.sample(range(10**6), k=len(tried) + 1) if s not in tried])
+        job["note"] = f"confirm champion {champ_id}: seed {len(tried) + 1} of {need}"
+        return job
+    tier = rng.choice(tiers)
     rec = recipe(ch[tier], results, cfg, repo)
     for _ in range(20):
         job = _draw(cfg, ch, tier, done, rng, repo, rec)

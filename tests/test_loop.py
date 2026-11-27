@@ -206,7 +206,7 @@ def test_proposals_carry_a_seed_and_are_not_repeated(tmp_path):
     res = [_fake_result("n0", "nano", cfg, seed=1), _fake_result("m0", "mid", cfg, seed=1)]
     (tmp_path / "models" / "m0").mkdir(parents=True)
     (tmp_path / "models" / "m0" / "fold0.pt").touch()
-    cfg["search"].update(p_distill=1.0, p_prune=0.0)
+    cfg["search"].update(p_distill=1.0, p_prune=0.0, confirm_seeds=1)   # champion re-runs have their own test
     seen = []
     for k in range(MAX_REPEATS):
         job = propose(cfg, res, ["nano"], random.Random(k), tmp_path)
@@ -248,7 +248,7 @@ def test_mutations_and_seed_reruns_keep_how_the_champion_was_trained(tmp_path):
     from forecast.loop.worker import propose, recipe
 
     cfg = yaml.safe_load((ROOT / "configs" / "loop.yaml").read_text())
-    cfg["search"].update(p_distill=0.0, p_prune=0.0, tracks={})
+    cfg["search"].update(p_distill=0.0, p_prune=0.0, tracks={}, confirm_seeds=1)
     ver = cfg["eval"]["version"]
 
     def result(rid, tier, score, train=None, **job):
@@ -296,6 +296,77 @@ def test_mutations_and_seed_reruns_keep_how_the_champion_was_trained(tmp_path):
     cfg["tiers"]["nano"]["max_train_vram_gb"] = 0.01
     job = propose(cfg, res, ["nano"], random.Random(0), tmp_path)
     assert job["note"] == "seed re-run of n0" and job["kind"] == "distill" and job["teacher"] == "m0"
+
+
+def test_a_champion_is_rerun_with_new_seeds_before_it_is_mutated(tmp_path):
+    """2026-11-27: every tier's champion was one seed for hours (mid c1f5, nano 5167, large e6) while the
+    worker mutated it; whether it was a step or a lucky draw waited for the planner's next cycle."""
+    from forecast.loop.worker import CONFIRM_SEEDS, propose, rerun, signature
+
+    cfg = yaml.safe_load((ROOT / "configs" / "loop.yaml").read_text())
+    cfg["search"].update(p_distill=0.0, p_prune=0.0, tracks={})
+    assert cfg["search"]["confirm_seeds"] == CONFIRM_SEEDS == 3
+    for name in ("m0", "n0"):
+        (tmp_path / "models" / name).mkdir(parents=True)
+        (tmp_path / "models" / name / "fold0.pt").touch()
+    mid = _fake_result("m0", "mid", cfg, 0.04, seed=11, train={"batch_size": 2048, "lr": 0.0003},
+                       model={"kernel": 9})
+    nano = _fake_result("n0", "nano", cfg, 0.05, kind="distill", teacher="m0", seed=11, max_minutes=5)
+    res = [mid, nano, _fake_result("n1", "nano", cfg, 0.03, seed=11)]
+    # The re-run is the champion's own job: shape, settings and teacher, nothing else from the result.
+    assert rerun(mid, res, cfg, tmp_path) == {"tier": "mid", "kind": "train", "model": {"kernel": 9},
+                                               "train": {"batch_size": 2048, "lr": 0.0003}}
+    assert rerun(nano, res, cfg, tmp_path) == {"tier": "nano", "kind": "distill", "teacher": "m0"}
+    seen = {11}
+    for k in range(CONFIRM_SEEDS - 1):
+        job = propose(cfg, res, ["nano"], random.Random(k), tmp_path)
+        assert job["note"] == f"confirm champion n0: seed {k + 2} of 3" and job["teacher"] == "m0"
+        assert signature(job, cfg, seed=False) == signature(nano["job"], cfg, seed=False)
+        assert job["seed"] not in seen
+        seen.add(job["seed"])
+        # A lower score: n0 stays the champion. The second one fails: a failed run is a seed tried.
+        r = _fake_result(f"r{k}", "nano", cfg, 0.045, **{k_: v for k_, v in job.items() if k_ != "tier"})
+        res.append(r if k == 0 else {**r, "status": "error"})
+    # Three seeds tried: the worker goes back to mutating the champion (with its recipe).
+    for k in range(20):
+        job = propose(cfg, res, ["nano"], random.Random(k), tmp_path)
+        assert job["note"] == "mutation of n0" and job["teacher"] == "m0", job
+    # A worker serving several tiers confirms whichever champion still needs it (mid here) first.
+    for k in range(20):
+        job = propose(cfg, res, ["nano", "mid"], random.Random(k), tmp_path)
+        assert job["tier"] == "mid" and job["note"].startswith("confirm champion m0: seed 2")
+        assert job["train"] == {"batch_size": 2048, "lr": 0.0003} and job["model"] == {"kernel": 9}
+    # A re-run that scores higher becomes the champion; the configuration, and so the count, is the same.
+    better = _fake_result("m1", "mid", cfg, 0.06, **{k_: v for k_, v in job.items() if k_ != "tier"})
+    job = propose(cfg, res + [better], ["mid"], random.Random(0), tmp_path)
+    assert job["note"] == "confirm champion m1: seed 3 of 3" and job["seed"] not in (11, better["job"]["seed"])
+    # A pruned champion is re-run as the same prune of the same parent.
+    pruned = _fake_result("p0", "mid", cfg, 0.07, kind="prune", init_from="m0", sparsity=0.5, seed=5,
+                          train={"lr": 0.0003, "max_epochs": 15})
+    job = propose(cfg, res + [pruned], ["mid"], random.Random(0), tmp_path)
+    assert (job["kind"], job["init_from"], job["sparsity"]) == ("prune", "m0", 0.5) and job["seed"] != 5
+    assert job["train"] == {"lr": 0.0003, "max_epochs": 15}
+    # Not re-run here: the teacher's checkpoints are on another machine, the shape no longer fits the
+    # tier's VRAM, or the switch is off. The worker then proposes as before.
+    assert propose(cfg, res, ["nano"], random.Random(0), tmp_path / "elsewhere")["note"] == "mutation of n0"
+    tight = yaml.safe_load(yaml.safe_dump(cfg))
+    tight["tiers"]["mid"]["max_train_vram_gb"] = 0.01
+    assert propose(tight, res, ["mid"], random.Random(0), tmp_path)["note"] == "seed re-run of m0"
+    off = yaml.safe_load(yaml.safe_dump(cfg))
+    off["search"]["confirm_seeds"] = 1
+    assert propose(off, res, ["mid"], random.Random(0), tmp_path)["note"] == "mutation of m0"
+    # Results are worker-written data: a job with fields of the wrong type, keys the presets do not
+    # have, a path for a teacher, a parent from another eval.version or an impossible sparsity is not
+    # copied into a new job, and proposing carries on.
+    old = {**mid, "id": "old", "eval_version": cfg["eval"]["version"] - 1}
+    for bad in ("junk", None, {"model": "junk"}, {"model": {"kernel": "9; rm"}}, {"model": {"device": 1}},
+                {"train": {"lr": float("nan")}}, {"train": {"batch_size": True}}, {"train": {"shell": 1}},
+                {"teacher": "../../etc"}, {"teacher": ["m0"]}, {"init_from": "old", "sparsity": 0.5},
+                {"sparsity": 1.5}, {"sparsity": "0.5"}):
+        champ = {**_fake_result("x", "mid", cfg, 0.9), "job": bad}
+        assert rerun(champ, res + [old, champ], cfg, tmp_path) is None, bad
+        assert propose(cfg, res + [old, champ], ["mid"], random.Random(0), tmp_path)["tier"] == "mid"
+    assert rerun({**mid, "tier": "huge"}, res, cfg, tmp_path) is None
 
 
 def test_proposed_shapes_fit_the_tier_vram():

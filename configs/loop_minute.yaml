@@ -88,3 +88,4 @@ search:
   prune_sparsity: [0.3, 0.5, 0.7, 0.85]
   p_distill: 0.1
   p_prune: 0.15
+  confirm_seeds: 3         # a champion is re-run to this many seeds before it is mutated (configs/loop.yaml)

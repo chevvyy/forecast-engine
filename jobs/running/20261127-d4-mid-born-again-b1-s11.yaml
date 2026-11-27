@@ -15,6 +15,9 @@ train:
   batch_size: 2048
   lr: 0.0003
 seed: 11
-note: mid b1 distilled into its own shape and recipe; compare a3 (same seed, no teacher, +0.0356). Nano
-  students of b1 score above b1 itself, so is the gain the soft targets rather than the bigger teacher?
+note: mid b1 distilled into its own shape and recipe; compare a3 (same seed, no teacher,
+  +0.0356). Nano students of b1 score above b1 itself, so is the gain the soft targets
+  rather than the bigger teacher?
 origin: planner
+worker: pc-5070ti
+attempts: 1

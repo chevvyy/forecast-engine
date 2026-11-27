@@ -1,0 +1,15 @@
+id: 20261127-f5-prune50-e1-mid-teacher-b1
+tier: mid
+kind: prune
+init_from: 20261127-e1-mid-born-again-k15-s11
+teacher: 20261127-b1-mid-k9-batch2048-lr0003-s12
+sparsity: 0.5
+train:
+  lr: 0.0003
+  max_epochs: 15
+  batch_size: 2048
+seed: 11
+note: prune and finetune WITH the teacher the parent was distilled from. Without one, a 50% prune of this
+  configuration fell from +0.044 to +0.032 and lost its return skill (e8); the last log row guessed the
+  missing teacher was why
+origin: planner

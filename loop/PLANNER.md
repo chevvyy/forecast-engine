@@ -39,7 +39,9 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
    Once the minute track has results: `python -m forecast.loop.leaderboard --config loop_minute` too
    (`experiments/LEADERBOARD_minute.md`). Minute and daily scores are never compared with each other.
 4. **Decide the next experiments** from the results, and write 3-8 job files into `jobs/queued/`:
-   - re-run each new champion with 2 more seeds before trusting it (noise estimate);
+   - re-run each new champion with 2 more seeds before trusting it (noise estimate). Since 2026-11-27
+     13:10 the worker does this itself before it mutates a champion (`search.confirm_seeds`), so queue
+     a seed only where it must come first or the worker cannot do it (teacher not on its machine);
    - distil the large champion into mid, and mid into nano;
    - prune-and-finetune each champion at 2 sparsity levels;
    - targeted variations of whatever the last results say matters (lookback, kernel, width, lr...).
@@ -51,11 +53,12 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
    and are not the `teacher` / `init_from` of a job still in `jobs/queued/`.
    Champion and runner-up are per track and version (daily, minute, and the closed version 1). Also keep
    the first run of a configuration the log calls confirmed across seeds, while it is the confirmed
-   one for its tier (since 2026-11-27 09:10: nano `20261127-c1-distil-b1-nano-s11`, as the
-   first run 03cf of that configuration was never committed; mid
-   `20261127-a3-mid-k9-batch2048-lr0003-s11`; large `20261127-c6-large-01c4-batch2048-lr0003-s11`, the
-   champion; minute-2: nano
-   `20261127-a6-minute2-nano-s11`, mid `20261127-a8-minute2-mid-s11`).
+   one for its tier (since 2026-11-27 13:10: nano `20261127-c1-distil-b1-nano-s11`; mid
+   `20261127-155512-pc-5070ti-c1f5`; large `20261127-c6-large-01c4-batch2048-lr0003-s11`, until the
+   distilled configuration of e6 / 161c has its third seed, then `20261127-e6-large-c6-distil-b1-s11`;
+   minute-2: nano `20261127-d8-minute2-distil-a8-nano-s11`, mid `20261127-a8-minute2-mid-s11`).
+   Keep a run that is the `teacher` of a tier's champion too (now `20261127-b1-mid-k9-batch2048-lr0003-s12`):
+   a second worker could not re-run or mutate that champion without it.
    Keep `jobs/done/` and `results/` (they are the experiment record).
 7. **Push** to `loop`. If the push is rejected, `git pull --rebase` and retry; never force-push.
 8. **Tell Dev only when it matters:** a worker down > 6 h, the loop blocked on something only he can
@@ -291,8 +294,27 @@ Minute track: `minute-1` = unconditional and HAR baselines, no clock (2 runs, cl
       default changed would group under its old settings, which is the intent, and old prune results
       with the wrong recorded shape (section above) group by that wrong shape; none is near the top.
       **Next cycle must check on the real machine:** the worker restarted on this commit and results
-      keep arriving (the worker imports this module); (3) [ ] `propose` re-runs a would-be champion with new seeds before
-      anything else; (4) [ ] early stopping inside the epoch.
+      keep arriving (the worker imports this module); **Checked 2026-11-27 13:10:** results kept arriving after that
+      commit (17 runs, none failed); (3) [x] `propose` re-runs a champion with new seeds before anything
+      else (done 2026-11-27 13:10): while a tier's champion configuration has fewer than
+      `search.confirm_seeds` = 3 seeds, the worker's next self-invented job in that track is the
+      champion's own job with a new seed (`worker.rerun`: same shape, training settings, teacher, parent
+      and sparsity, rebuilt field by field from the result, which is worker-written data), note
+      "confirm champion <id>: seed n of 3". Failed runs count as seeds tried, so it stops after three
+      attempts either way; a champion whose teacher or parent is not on the machine, or that no longer
+      fits the tier's VRAM estimate, is skipped. Queued jobs still come first. It is the champion that
+      is re-run, after the fact: a first run that tops the board is still the champion at once, and
+      nothing is promoted or demoted by the re-runs (the board's seed-mean section says what the
+      configuration is worth). Proposals only: evaluation untouched, no version bump. With the results
+      of that hour it would re-run daily nano 5167 (1 seed) and large 161c (2), minute mid e5 (1) and
+      minute large 34b6 (2). Only ever run on synthetic data. **Next cycle must check on the real
+      machine:** the worker restarted on this commit; results whose `job.note` starts with "confirm
+      champion" exist, none failed, and each has the champion's `teacher` / `train`; every champion on
+      both boards has 3 seeds in the "Configurations by seed mean" section or a confirm job on the way;
+      and that mutations resume afterwards (if the worker does nothing but confirm jobs for a whole
+      cycle, set `search.confirm_seeds: 1`, a config edit). Not done, and the remaining half of this
+      line's first sentence: promotion that requires beating the old champion by more than the noise;
+      (4) [ ] early stopping inside the epoch.
 - [ ] LightGBM quantile baseline on tabular features (the scaffold's "first real model"); deep models
       must be compared against it in every result. Bumps `eval.version`.
       Same version bump: a fairer return baseline. Returns are scaled by rv20 and the return baseline

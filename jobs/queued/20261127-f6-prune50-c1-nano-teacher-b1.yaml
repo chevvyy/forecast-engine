@@ -1,0 +1,13 @@
+id: 20261127-f6-prune50-c1-nano-teacher-b1
+tier: nano
+kind: prune
+init_from: 20261127-c1-distil-b1-nano-s11
+teacher: 20261127-b1-mid-k9-batch2048-lr0003-s12
+sparsity: 0.5
+train:
+  lr: 0.0003
+  max_epochs: 15
+seed: 11
+note: 'same question on nano: c1 pruned 50% without a teacher scored +0.0395 against c1''s +0.0478 (d6);
+  here the finetune keeps b1''s soft targets'
+origin: planner

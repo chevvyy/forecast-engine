@@ -1,0 +1,21 @@
+id: 20261127-f1-large-distil-b1-s13
+tier: large
+kind: distill
+teacher: 20261127-b1-mid-k9-batch2048-lr0003-s12
+model:
+  lookback: 256
+  patch: 8
+  stride: 4
+  d_model: 384
+  n_blocks: 4
+  kernel: 15
+  ffn: 2
+  dropout: 0.3
+train:
+  batch_size: 2048
+  lr: 0.0003
+seed: 13
+note: 'third seed of the large champion''s configuration (c6 shape distilled from mid b1: +0.0433 on seed
+  11, +0.0436 on a worker seed; without the teacher +0.020 over 4 seeds). Three seeds is the bar for calling
+  it confirmed'
+origin: planner

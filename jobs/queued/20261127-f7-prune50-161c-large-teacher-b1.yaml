@@ -1,0 +1,14 @@
+id: 20261127-f7-prune50-161c-large-teacher-b1
+tier: large
+kind: prune
+init_from: 20261127-180527-pc-5070ti-161c
+teacher: 20261127-b1-mid-k9-batch2048-lr0003-s12
+sparsity: 0.5
+train:
+  lr: 0.0003
+  max_epochs: 15
+  batch_size: 2048
+seed: 11
+note: prune and finetune the large champion at 50%, keeping its teacher b1 (prunes of c6, which had no
+  teacher, kept +0.015 of +0.024)
+origin: planner

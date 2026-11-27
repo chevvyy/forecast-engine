@@ -1,0 +1,20 @@
+id: 20261127-f4-large-born-again-161c-s11
+tier: large
+kind: distill
+teacher: 20261127-180527-pc-5070ti-161c
+model:
+  lookback: 256
+  patch: 8
+  stride: 4
+  d_model: 384
+  n_blocks: 4
+  kernel: 15
+  ffn: 2
+  dropout: 0.3
+train:
+  batch_size: 2048
+  lr: 0.0003
+seed: 11
+note: 'the large champion distilled into its own shape (same seed as e6): on mid this step gave +0.003
+  to +0.006. If large stays at +0.043 the tier''s size buys nothing beyond what mid already has'
+origin: planner

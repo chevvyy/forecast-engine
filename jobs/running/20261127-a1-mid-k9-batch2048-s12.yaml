@@ -15,3 +15,5 @@ train:
 seed: 12
 note: seed re-run of the new mid champion z7 (+0.0284, one seed)
 origin: planner
+worker: pc-5070ti
+attempts: 1

@@ -1,0 +1,20 @@
+id: 20261127-d4-mid-born-again-b1-s11
+tier: mid
+kind: distill
+teacher: 20261127-b1-mid-k9-batch2048-lr0003-s12
+model:
+  lookback: 256
+  patch: 4
+  stride: 2
+  d_model: 64
+  n_blocks: 3
+  kernel: 9
+  ffn: 2
+  dropout: 0.2
+train:
+  batch_size: 2048
+  lr: 0.0003
+seed: 11
+note: mid b1 distilled into its own shape and recipe; compare a3 (same seed, no teacher, +0.0356). Nano
+  students of b1 score above b1 itself, so is the gain the soft targets rather than the bigger teacher?
+origin: planner

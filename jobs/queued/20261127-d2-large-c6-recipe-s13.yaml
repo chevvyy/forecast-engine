@@ -1,0 +1,18 @@
+id: 20261127-d2-large-c6-recipe-s13
+tier: large
+kind: train
+model:
+  lookback: 256
+  patch: 8
+  stride: 4
+  d_model: 384
+  n_blocks: 4
+  kernel: 15
+  ffn: 2
+  dropout: 0.3
+train:
+  batch_size: 2048
+  lr: 0.0003
+seed: 13
+note: second seed re-run of c6
+origin: planner

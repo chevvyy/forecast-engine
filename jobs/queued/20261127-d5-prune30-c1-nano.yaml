@@ -1,0 +1,12 @@
+id: 20261127-d5-prune30-c1-nano
+tier: nano
+kind: prune
+init_from: 20261127-c1-distil-b1-nano-s11
+sparsity: 0.3
+train:
+  lr: 0.0003
+  max_epochs: 15
+seed: 11
+note: prune and finetune the new nano champion c1 at 30% (finetune has no teacher); an 85% prune by the
+  worker scored +0.0157
+origin: planner

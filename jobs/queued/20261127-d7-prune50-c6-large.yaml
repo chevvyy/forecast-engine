@@ -1,0 +1,13 @@
+id: 20261127-d7-prune50-c6-large
+tier: large
+kind: prune
+init_from: 20261127-c6-large-01c4-batch2048-lr0003-s11
+sparsity: 0.5
+train:
+  lr: 0.0003
+  max_epochs: 15
+  batch_size: 2048
+seed: 11
+note: prune and finetune the new large champion c6 at 50%, at its own batch size; 85% prunes by the worker
+  at batch 512 scored +0.0080 and +0.0117
+origin: planner

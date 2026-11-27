@@ -1,0 +1,11 @@
+id: 20261127-d6-prune50-c1-nano
+tier: nano
+kind: prune
+init_from: 20261127-c1-distil-b1-nano-s11
+sparsity: 0.5
+train:
+  lr: 0.0003
+  max_epochs: 15
+seed: 11
+note: prune and finetune the new nano champion c1 at 50%
+origin: planner

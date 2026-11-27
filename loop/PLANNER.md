@@ -49,7 +49,8 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
    and are not the `teacher` / `init_from` of a job still in `jobs/queued/`.
    Champion and runner-up are per track and version (daily, minute, and the closed version 1). Also keep
    the first run of a configuration the log calls confirmed across seeds, while it is the confirmed
-   one for its tier (since 2026-11-27 01:10: nano `20261126-x3-nano-champ-lr0003-s11`, mid
+   one for its tier (since 2026-11-27 05:15: nano `20261127-c1-distil-b1-nano-s11`, the champion, as the
+   first run 03cf of that configuration was never committed; mid
    `20261127-a3-mid-k9-batch2048-lr0003-s11`, large `20261126-190159-pc-5070ti-01c4`; minute-2: nano
    `20261127-a6-minute2-nano-s11`, mid `20261127-a8-minute2-mid-s11`).
    Keep `jobs/done/` and `results/` (they are the experiment record).
@@ -220,7 +221,9 @@ Minute track: `minute-1` = unconditional and HAR baselines, no clock (2 runs, cl
       stored bars held something the calendar now drops, which I did not expect: bump to `minute-3`
       and say so. Not covered: unscheduled closures, and dates after 2028 (treated as full days; the
       test keeps the pins inside the table);
-      (4) out-of-core windows before the symbol list grows; (5) results net of a per-trade
+      (4) out-of-core windows before the symbol list grows (reading taken 2026-11-27 05:15: this is a
+      precondition for a bigger minute universe that nobody has asked for yet, so it does not hold up
+      the items below; do it first when the minute symbol list is to grow); (5) results net of a per-trade
       cost (docs/EVALUATION.md section 4). That last one needs a backtest of a simple rule, which the
       loop's standing rules exclude (no trading code), so it waits for Dev to say what he wants there.
       Can also be tried on Yahoo `1h`/`5m` (keyless stopgaps: ~730 and ~60 days; note Yahoo `5m` needs
@@ -260,6 +263,23 @@ Minute track: `minute-1` = unconditional and HAR baselines, no clock (2 runs, cl
       also at lr 0.0003 and at batch 2048, both of which scored better. The best point is probably inside
       the first epoch. Evaluate the early-stopping slice every N steps (or a fraction of an epoch) and
       record the best step in `folds`. This changes training, not the evaluation: no version bump.
+      Parts, in this order: (1) [x] a mutation keeps how the champion was trained (done 2026-11-27
+      05:15): `worker.recipe` gives a mutation, and the seed re-run fallback, the champion's `lr`,
+      `weight_decay` and `batch_size` where they differ from the defaults, and its `teacher` if the
+      champion was distilled and the teacher's checkpoints are on the machine (the job is then a
+      `distill`); a mutated key still overrides. A pruned champion's recipe is that of the run it descends
+      from. Only grid values and finished runs of the same `eval.version` are taken over (results are
+      worker-written data). Proposals only: evaluation untouched, no version bump. With the champions of
+      that hour, mutations are: nano distilled from mid b1, mid and large at batch 2048 / lr 0.0003;
+      minute champions are presets, so nothing changes there. Only ever run on synthetic data. **Next
+      cycle must check on the real machine:** results with `git` newer than this commit whose `job.note`
+      starts with "mutation of" carry the champion's `train` (daily mid / large) or `teacher` (daily
+      nano); none failed (a large shape at batch 2048 that passes `fits_vram` but does not fit would
+      show as an error or `fits_tier: false`: if so, lower the estimate's limit, do not drop the batch);
+      and the mean score of worker mutations per tier against the earlier ones (nano about +0.02, mid
+      +0.017, large +0.006). (2) [ ] leaderboard ranks configurations by seed mean (with n and sd)
+      next to the single-run board; (3) [ ] `propose` re-runs a would-be champion with new seeds before
+      anything else; (4) [ ] early stopping inside the epoch.
 - [ ] LightGBM quantile baseline on tabular features (the scaffold's "first real model"); deep models
       must be compared against it in every result. Bumps `eval.version`.
       Same version bump: a fairer return baseline. Returns are scaled by rv20 and the return baseline

@@ -15,7 +15,9 @@ train:
   batch_size: 2048
   lr: 0.0003
 seed: 13
-note: 'third seed of the large champion''s configuration (c6 shape distilled from mid b1: +0.0433 on seed
-  11, +0.0436 on a worker seed; without the teacher +0.020 over 4 seeds). Three seeds is the bar for calling
-  it confirmed'
+note: 'third seed of the large champion''s configuration (c6 shape distilled from
+  mid b1: +0.0433 on seed 11, +0.0436 on a worker seed; without the teacher +0.020
+  over 4 seeds). Three seeds is the bar for calling it confirmed'
 origin: planner
+worker: pc-5070ti
+attempts: 1

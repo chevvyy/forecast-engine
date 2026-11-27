@@ -9,3 +9,5 @@ train:
 seed: 11
 note: prune and finetune the new nano champion c1 at 50%
 origin: planner
+worker: pc-5070ti
+attempts: 1

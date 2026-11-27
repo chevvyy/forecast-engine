@@ -1,0 +1,8 @@
+id: 20261127-a6-minute2-nano-s11
+tier: nano
+kind: train
+config: loop_minute
+seed: 11
+note: 'first minute-2 run on real bars: time-of-day inputs and the HAR time-of-day
+  baseline. Check pinball.vol_har_tod against vol_har before reading the score'
+origin: planner

@@ -1,0 +1,7 @@
+id: 20261127-a7-minute2-nano-s12
+tier: nano
+kind: train
+config: loop_minute
+seed: 12
+note: second seed of a6 (minute-2)
+origin: planner

@@ -1,0 +1,7 @@
+id: 20261127-a8-minute2-mid-s11
+tier: mid
+kind: train
+config: loop_minute
+seed: 11
+note: first mid run of the minute track (minute-2)
+origin: planner

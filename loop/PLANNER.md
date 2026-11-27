@@ -49,7 +49,8 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
    and are not the `teacher` / `init_from` of a job still in `jobs/queued/`.
    Champion and runner-up are per track and version (daily, minute, and the closed version 1). Also keep
    the first run of a configuration the log calls confirmed across seeds, while it is the confirmed
-   one for its tier (mid: `20261126-135541-pc-5070ti-a7c6`).
+   one for its tier (since 2026-11-26 17:15: nano `20261126-x3-nano-champ-lr0003-s11`, mid
+   `20261126-192624-pc-5070ti-066b`, large `20261126-190159-pc-5070ti-01c4`).
    Keep `jobs/done/` and `results/` (they are the experiment record).
 7. **Push** to `loop`. If the push is rejected, `git pull --rebase` and retry; never force-push.
 8. **Tell Dev only when it matters:** a worker down > 6 h, the loop blocked on something only he can
@@ -79,6 +80,8 @@ together with an `eval.version` bump (new bars move the holdout and every fold).
 1 = 35 symbols, closed 2026-11-26, final board in `experiments/LEADERBOARD_v1.md`;
 2 = 539-symbol list (`configs/data/universe_wide.txt`), data to 2026-11-25.
 `experiments/LEADERBOARD.md` shows the current version only.
+Minute track: `minute-1` = unconditional and HAR baselines, no clock (2 runs, closed 2026-11-26, board in
+`experiments/LEADERBOARD_minute_v1.md`); `minute-2` = time-of-day inputs and the HAR time-of-day baseline.
 
 ## Backlog (ordered; tick items off here as they land)
 - [x] First real-data triage (done 2026-11-25 21:15): `ok` runs from pc-5070ti on Alpaca daily bars since
@@ -178,9 +181,24 @@ together with an `eval.version` bump (new bars move the holdout and every fold).
       later (`test_pinned_minute_load_fetches_nothing_past_the_pin_and_freezes_the_adjustment`). Same
       bars as before as long as nothing went ex-dividend on 2026-11-26 or since: **next cycle must check
       that z8 reports `data_hash` b1f8ab268f40**; if it differs, y8 and z8 are not comparable, say so in
-      the log and re-run y8's seed;
-      (2) a time-of-day input and an intraday volatility baseline that knows the U-shape of the session
-      (without it the model may "beat" HAR only by learning the clock); (3) exchange calendar for
+      the log and re-run y8's seed. **Checked 2026-11-26 17:15:** z8 reports b1f8ab268f40, the same bars
+      as y8; it scored +0.0329 against y8's +0.0333;
+      (2) [x] time-of-day inputs and a volatility baseline that knows the shape of the session (done
+      2026-11-26 17:15): intraday rows carry `tod` (share of the 09:30-16:00 New York session elapsed
+      when the row becomes usable) and `tod_u` = (2 tod - 1)^2 as two more side inputs
+      (`features.build.TAB_TOD`, from the clock alone: leakage test), and volatility is scored against
+      the best of unconditional, HAR and `baselines.HarTod` (HAR plus one level per 15-minute bin, per
+      horizon: a multiplicative time-of-day factor on forward / trailing volatility). The result names
+      the winner in `vol_baseline` and carries `pinball.vol_har_tod`. Baselines changed, so the track is
+      now `minute-2`; y8 / z8 stay on the closed `minute-1` board and their checkpoints (2 side inputs)
+      are refused as teacher or parent of a minute-2 job. The daily track is untouched (dry run
+      bit-identical, no version bump). On synthetic sessions, which have no time-of-day pattern, HarTod is
+      about 2% worse than HAR, as it should be. **Next cycle must check on the real machine (a6, a7,
+      a8):** how much `vol_har_tod` improves on `vol_har` (if not at all between 11:29 and 14:59, say
+      so), which baseline `vol_baseline` names, and only then the scores; expect them below minute-1's
+      +0.033 if part of that was the clock. Known gap: on a half-day the time of day does not know the
+      early close (item 3);
+      (3) exchange calendar for
       half-days; (4) out-of-core windows before the symbol list grows; (5) results net of a per-trade
       cost (docs/EVALUATION.md section 4). That last one needs a backtest of a simple rule, which the
       loop's standing rules exclude (no trading code), so it waits for Dev to say what he wants there.

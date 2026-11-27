@@ -1,0 +1,18 @@
+id: 20261127-a4-large-d384-b4-batch2048-s11
+tier: large
+kind: train
+model:
+  lookback: 256
+  patch: 8
+  stride: 4
+  d_model: 384
+  n_blocks: 4
+  kernel: 15
+  ffn: 2
+  dropout: 0.3
+train:
+  batch_size: 2048
+seed: 11
+note: batch 2048 removed the negative return skill in nano and mid; same test on the
+  confirmed large shape. compare with z3 (same seed, batch 512)
+origin: planner

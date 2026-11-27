@@ -1,0 +1,12 @@
+id: 20261127-a5-prune-large-a13a-70
+tier: large
+kind: prune
+init_from: 20261126-193730-pc-5070ti-a13a
+sparsity: 0.7
+train:
+  lr: 0.0003
+  max_epochs: 15
+seed: 11
+note: 85% pruning of a13a kept the score and lost the negative return skill (66b6);
+  fill in the curve at 70%
+origin: planner

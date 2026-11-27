@@ -15,6 +15,8 @@ train:
   batch_size: 2048
   lr: 0.0003
 seed: 12
-note: second seed of d4 (b1 distilled into its own shape, kernel 9, +0.0400 on seed 11); with e1 / e2
-  this separates the kernel from the seed
+note: second seed of d4 (b1 distilled into its own shape, kernel 9, +0.0400 on seed
+  11); with e1 / e2 this separates the kernel from the seed
 origin: planner
+worker: pc-5070ti
+attempts: 1

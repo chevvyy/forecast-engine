@@ -15,6 +15,9 @@ train:
   batch_size: 2048
   lr: 0.0003
 seed: 11
-note: 'the confirmed large configuration (c6 recipe, +0.020 over 4 seeds, +0.0243 on this seed) with mid
-  b1 as teacher: the teacher is smaller but scores higher, and soft targets helped nano and mid'
+note: 'the confirmed large configuration (c6 recipe, +0.020 over 4 seeds, +0.0243
+  on this seed) with mid b1 as teacher: the teacher is smaller but scores higher,
+  and soft targets helped nano and mid'
 origin: planner
+worker: pc-5070ti
+attempts: 1

@@ -1,0 +1,142 @@
+{
+  "config": "loop",
+  "coverage_80": [
+    [
+      0.7227,
+      0.7804
+    ],
+    [
+      0.7233,
+      0.7608
+    ],
+    [
+      0.7085,
+      0.7273
+    ]
+  ],
+  "cpu_ms_per_forecast": 1.734,
+  "data_hash": "500294764fb3",
+  "device": "cuda",
+  "dm": {
+    "all": [
+      -0.25010121945211716,
+      0.8025090729548001
+    ],
+    "ret": [
+      3.4587617569514446,
+      0.0005426646842624375
+    ],
+    "vol": [
+      -8.996118482453198,
+      2.3383891153189863e-19
+    ]
+  },
+  "eval_version": 2,
+  "finished": "2026-11-27T01:17:05+00:00",
+  "fits_tier": true,
+  "folds": [
+    {
+      "epochs": 6,
+      "es_pinball": 0.24370136857032776,
+      "n_train": 753990,
+      "n_val": 93975,
+      "peak_vram_gb": 6.232
+    },
+    {
+      "epochs": 6,
+      "es_pinball": 0.24911586940288544,
+      "n_train": 838233,
+      "n_val": 94394,
+      "peak_vram_gb": 6.236
+    },
+    {
+      "epochs": 6,
+      "es_pinball": 0.25230440497398376,
+      "n_train": 922663,
+      "n_val": 95360,
+      "peak_vram_gb": 6.238
+    }
+  ],
+  "git": "b0e4f3cd",
+  "gpu": "NVIDIA GeForce RTX 5070 Ti",
+  "horizons": [
+    1,
+    5,
+    20
+  ],
+  "id": "20261127-a4-large-d384-b4-batch2048-s11",
+  "job": {
+    "attempts": 1,
+    "id": "20261127-a4-large-d384-b4-batch2048-s11",
+    "kind": "train",
+    "model": {
+      "d_model": 384,
+      "dropout": 0.3,
+      "ffn": 2,
+      "kernel": 15,
+      "lookback": 256,
+      "n_blocks": 4,
+      "patch": 8,
+      "stride": 4
+    },
+    "note": "batch 2048 removed the negative return skill in nano and mid; same test on the confirmed large shape. compare with z3 (same seed, batch 512)",
+    "origin": "planner",
+    "seed": 11,
+    "tier": "large",
+    "train": {
+      "batch_size": 2048
+    },
+    "worker": "pc-5070ti"
+  },
+  "kind": "train",
+  "minutes": 15.91,
+  "model": {
+    "d_model": 384,
+    "dropout": 0.3,
+    "ffn": 2,
+    "kernel": 15,
+    "lookback": 256,
+    "n_blocks": 4,
+    "patch": 8,
+    "stride": 4
+  },
+  "nonzero_params": 2450718,
+  "onnx_bytes": 9822780,
+  "onnx_max_abs_diff": 4.76837158203125e-07,
+  "params": 2450718,
+  "peak_vram_gb": 6.238,
+  "pinball": {
+    "ret_baseline": 0.3055918514728546,
+    "ret_model": 0.3151896893978119,
+    "vol_baseline": 0.19298601150512695,
+    "vol_har": 0.19298601150512695,
+    "vol_model": 0.1825317144393921,
+    "vol_unconditional": 0.20153072476387024
+  },
+  "rank_ic_h1": 0.010983135651461284,
+  "score": 0.011381953954696655,
+  "skill_ret": -0.03140735626220703,
+  "skill_vol": 0.05417126417160034,
+  "status": "ok",
+  "symbols": 539,
+  "tab": [
+    "log_rv5_rv20",
+    "log_rv60_rv20"
+  ],
+  "tier": "large",
+  "train": {
+    "batch_size": 2048,
+    "distill_alpha": 0.5,
+    "grad_clip": 1.0,
+    "lr": 0.001,
+    "max_epochs": 40,
+    "patience": 5,
+    "weight_decay": 0.0001
+  },
+  "universe": {
+    "note": "current index members and megacaps: survivorship bias, return skill is optimistic",
+    "requested": 539
+  },
+  "vol_baseline": "har",
+  "worker": "pc-5070ti"
+}

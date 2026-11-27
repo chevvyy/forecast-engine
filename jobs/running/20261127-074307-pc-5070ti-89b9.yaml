@@ -1,0 +1,20 @@
+tier: mid
+kind: train
+model:
+  d_model: 64
+  dropout: 0.2
+  ffn: 2
+  kernel: 5
+  lookback: 120
+  n_blocks: 3
+  patch: 4
+  stride: 2
+train:
+  batch_size: 1024
+note: mutation of 20261127-a8-minute2-mid-s11
+seed: 435254
+id: 20261127-074307-pc-5070ti-89b9
+origin: worker
+config: loop_minute
+worker: pc-5070ti
+attempts: 1

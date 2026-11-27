@@ -1,0 +1,11 @@
+id: 20261127-d8-minute2-distil-a8-nano-s11
+tier: nano
+config: loop_minute
+kind: distill
+teacher: 20261127-a8-minute2-mid-s11
+seed: 11
+note: minute-2 nano preset distilled from the minute mid champion a8; compare a6 (same
+  seed, no teacher, +0.0256). Does the teacher effect seen on daily bars carry over?
+origin: planner
+worker: pc-5070ti
+attempts: 1

@@ -17,3 +17,5 @@ train:
 seed: 12
 note: second seed re-run of c1f5
 origin: planner
+worker: pc-5070ti
+attempts: 1

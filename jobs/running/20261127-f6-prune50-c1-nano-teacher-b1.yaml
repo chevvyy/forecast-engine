@@ -8,6 +8,8 @@ train:
   lr: 0.0003
   max_epochs: 15
 seed: 11
-note: 'same question on nano: c1 pruned 50% without a teacher scored +0.0395 against c1''s +0.0478 (d6);
-  here the finetune keeps b1''s soft targets'
+note: 'same question on nano: c1 pruned 50% without a teacher scored +0.0395 against
+  c1''s +0.0478 (d6); here the finetune keeps b1''s soft targets'
 origin: planner
+worker: pc-5070ti
+attempts: 1

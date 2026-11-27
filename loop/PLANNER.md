@@ -34,6 +34,8 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
 3. **Leaderboard.** `python -m forecast.loop.leaderboard`, commit `experiments/LEADERBOARD.md`, and add
    one row per cycle to `experiments/LOG.md` (date, runs since last cycle, champion per tier with score,
    what was learned). Include the total number of configurations tried so far.
+   Take "its configuration scores X over n seeds" from the board's "Configurations by seed mean"
+   section, not from the single-run tables: a tier's champion run is the luckiest seed tried.
    Once the minute track has results: `python -m forecast.loop.leaderboard --config loop_minute` too
    (`experiments/LEADERBOARD_minute.md`). Minute and daily scores are never compared with each other.
 4. **Decide the next experiments** from the results, and write 3-8 job files into `jobs/queued/`:
@@ -49,9 +51,10 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
    and are not the `teacher` / `init_from` of a job still in `jobs/queued/`.
    Champion and runner-up are per track and version (daily, minute, and the closed version 1). Also keep
    the first run of a configuration the log calls confirmed across seeds, while it is the confirmed
-   one for its tier (since 2026-11-27 05:15: nano `20261127-c1-distil-b1-nano-s11`, the champion, as the
+   one for its tier (since 2026-11-27 09:10: nano `20261127-c1-distil-b1-nano-s11`, as the
    first run 03cf of that configuration was never committed; mid
-   `20261127-a3-mid-k9-batch2048-lr0003-s11`, large `20261126-190159-pc-5070ti-01c4`; minute-2: nano
+   `20261127-a3-mid-k9-batch2048-lr0003-s11`; large `20261127-c6-large-01c4-batch2048-lr0003-s11`, the
+   champion; minute-2: nano
    `20261127-a6-minute2-nano-s11`, mid `20261127-a8-minute2-mid-s11`).
    Keep `jobs/done/` and `results/` (they are the experiment record).
 7. **Push** to `loop`. If the push is rejected, `git pull --rebase` and retry; never force-push.
@@ -277,8 +280,18 @@ Minute track: `minute-1` = unconditional and HAR baselines, no clock (2 runs, cl
       nano); none failed (a large shape at batch 2048 that passes `fits_vram` but does not fit would
       show as an error or `fits_tier: false`: if so, lower the estimate's limit, do not drop the batch);
       and the mean score of worker mutations per tier against the earlier ones (nano about +0.02, mid
-      +0.017, large +0.006). (2) [ ] leaderboard ranks configurations by seed mean (with n and sd)
-      next to the single-run board; (3) [ ] `propose` re-runs a would-be champion with new seeds before
+      +0.017, large +0.006). (2) [x] leaderboard ranks configurations by seed mean (done 2026-11-27 09:10):
+      `leaderboard.configurations` groups runs by `config_key` (tier, recorded model shape and training
+      settings, teacher, parent, sparsity; not `kind`, which is a label) and `render` adds a
+      "Configurations by seed mean" section per tier (mean, sample sd, seeds, min, max; at least 2
+      different seeds; a repeated seed counts once) under the single-run tables. Display only:
+      `champions`, proposals and the evaluation are untouched, no version bump. Checked on the real
+      results: it reproduces the hand-computed numbers of earlier log rows (nano distil +0.0467 over 3,
+      mid +0.0375 over 3, minute nano preset +0.024 over 4). Known limit: a run recorded before a
+      default changed would group under its old settings, which is the intent, and old prune results
+      with the wrong recorded shape (section above) group by that wrong shape; none is near the top.
+      **Next cycle must check on the real machine:** the worker restarted on this commit and results
+      keep arriving (the worker imports this module); (3) [ ] `propose` re-runs a would-be champion with new seeds before
       anything else; (4) [ ] early stopping inside the epoch.
 - [ ] LightGBM quantile baseline on tabular features (the scaffold's "first real model"); deep models
       must be compared against it in every result. Bumps `eval.version`.

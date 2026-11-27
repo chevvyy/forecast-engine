@@ -1,0 +1,12 @@
+id: 20261127-e8-prune50-c1f5-mid
+tier: mid
+kind: prune
+init_from: 20261127-155512-pc-5070ti-c1f5
+sparsity: 0.5
+train:
+  lr: 0.0003
+  max_epochs: 15
+  batch_size: 2048
+seed: 11
+note: prune and finetune the new mid champion c1f5 at 50%; an 85% prune of d4 by the worker kept +0.0207
+origin: planner

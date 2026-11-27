@@ -1,0 +1,20 @@
+id: 20261127-e6-large-c6-distil-b1-s11
+tier: large
+kind: distill
+teacher: 20261127-b1-mid-k9-batch2048-lr0003-s12
+model:
+  lookback: 256
+  patch: 8
+  stride: 4
+  d_model: 384
+  n_blocks: 4
+  kernel: 15
+  ffn: 2
+  dropout: 0.3
+train:
+  batch_size: 2048
+  lr: 0.0003
+seed: 11
+note: 'the confirmed large configuration (c6 recipe, +0.020 over 4 seeds, +0.0243 on this seed) with mid
+  b1 as teacher: the teacher is smaller but scores higher, and soft targets helped nano and mid'
+origin: planner

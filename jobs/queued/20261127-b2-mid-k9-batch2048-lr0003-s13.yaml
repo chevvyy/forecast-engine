@@ -1,0 +1,8 @@
+id: 20261127-b2-mid-k9-batch2048-lr0003-s13
+tier: mid
+kind: train
+model: {lookback: 256, patch: 4, stride: 2, d_model: 64, n_blocks: 3, kernel: 9, ffn: 2, dropout: 0.2}
+train: {batch_size: 2048, lr: 0.0003}
+seed: 13
+note: seed re-run of the new mid champion a3 (+0.0356, one seed) before trusting it
+origin: planner

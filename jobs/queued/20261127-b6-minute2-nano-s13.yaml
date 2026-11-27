@@ -1,0 +1,7 @@
+id: 20261127-b6-minute2-nano-s13
+tier: nano
+kind: train
+config: loop_minute
+seed: 13
+note: third seed of the minute-2 nano preset (a6 +0.0256, a7 +0.0266)
+origin: planner

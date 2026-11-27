@@ -49,8 +49,8 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
    and are not the `teacher` / `init_from` of a job still in `jobs/queued/`.
    Champion and runner-up are per track and version (daily, minute, and the closed version 1). Also keep
    the first run of a configuration the log calls confirmed across seeds, while it is the confirmed
-   one for its tier (since 2026-11-26 17:15: nano `20261126-x3-nano-champ-lr0003-s11`, mid
-   `20261126-192624-pc-5070ti-066b`, large `20261126-190159-pc-5070ti-01c4`).
+   one for its tier (since 2026-11-26 21:15: nano `20261126-x3-nano-champ-lr0003-s11`, mid
+   `20261126-z7-mid-k9-batch2048-s11`, large `20261126-190159-pc-5070ti-01c4`).
    Keep `jobs/done/` and `results/` (they are the experiment record).
 7. **Push** to `loop`. If the push is rejected, `git pull --rebase` and retry; never force-push.
 8. **Tell Dev only when it matters:** a worker down > 6 h, the loop blocked on something only he can
@@ -158,7 +158,8 @@ Minute track: `minute-1` = unconditional and HAR baselines, no clock (2 runs, cl
       that day's volatility level) and the new `eval.dm_lag` 211 (label overlap needs 60; a session also
       covers within-day correlation of losses). Its `eval.version` is the string `minute-1`; champions,
       worker proposals and leaderboards are all per version, so the tracks cannot compete, and
-      `tests/test_loop.py` keeps the versions distinct. Workers never invent minute jobs. Own board:
+      `tests/test_loop.py` keeps the versions distinct. Workers never invent minute jobs (until part (c),
+      2026-11-26 21:15). Own board:
       `leaderboard --config loop_minute` -> `experiments/LEADERBOARD_minute.md`.
       Only ever run on synthetic sessions. Job y8 is the first on real Alpaca minute bars.
       **Next cycle must check on the real machine:** y8's `status` (the ingestor has never talked to the
@@ -197,7 +198,11 @@ Minute track: `minute-1` = unconditional and HAR baselines, no clock (2 runs, cl
       a8):** how much `vol_har_tod` improves on `vol_har` (if not at all between 11:29 and 14:59, say
       so), which baseline `vol_baseline` names, and only then the scores; expect them below minute-1's
       +0.033 if part of that was the clock. Known gap: on a half-day the time of day does not know the
-      early close (item 3);
+      early close (item 3). **Checked 2026-11-26 21:15 (a6, a7, a8):** `vol_har_tod` 0.0899 against
+      `vol_har` 0.0919 (2.2% lower loss, so the session's shape matters even between 11:29 and 14:59) and
+      every run names `har_tod` as its volatility baseline. Against it nano scores +0.0256 / +0.0266
+      (vol +0.048, minute-1 had +0.062 against plain HAR: about a quarter of that was the clock), mid
+      +0.0298 on one seed. Same data hash b1f8ab268f40;
       (3) exchange calendar for
       half-days; (4) out-of-core windows before the symbol list grows; (5) results net of a per-trade
       cost (docs/EVALUATION.md section 4). That last one needs a backtest of a simple rule, which the
@@ -205,9 +210,20 @@ Minute track: `minute-1` = unconditional and HAR baselines, no clock (2 runs, cl
       Can also be tried on Yahoo `1h`/`5m` (keyless stopgaps: ~730 and ~60 days; note Yahoo `5m` needs
       `range=60d`, the fetcher asks for 730d; at `1h` a session is 7 bars, so only lookback + horizon
       <= 7 fits).
-      (c) [ ] switch workers that have keys onto minute jobs: pc-5070ti reports `alpaca_keys: true`
-      (since 2026-11-25), so nothing is needed from Dev. Do it only after y8 has run cleanly and (b2b)
-      items 1 and 2 are in; until then the planner queues minute jobs by hand, a few per cycle.
+      (c) [x] switch workers that have keys onto minute jobs (done 2026-11-26 21:15, ahead of (b2b)
+      items 3-5: its own conditions, y8 clean and (b2b) 1 and 2 in, were met, and item 3 changes at most
+      one session of the pinned window). `search.tracks: {loop_minute: 0.3}` in `configs/loop.yaml` gives
+      30% of a worker's self-invented jobs, by count, to the minute track; `worker.pick_track` takes the
+      share only if the track's config loads, has its own `eval.version` and `search` grid, and the
+      machine has Alpaca keys, else the job is a daily one. The job is drawn from the minute track's own
+      champions and grid (`configs/loop_minute.yaml` -> `search`, lookbacks 30-120), carries
+      `config: loop_minute` and lands on the minute board only. Evaluation untouched, no version bump.
+      Only ever run on synthetic sessions. **Next cycle must check on the real machine:** results with
+      `job.origin: worker` and `config: loop_minute` exist, all `eval_version` minute-2 with data hash
+      b1f8ab268f40 and 10 symbols; the first one is the large preset (no large minute run yet); roughly
+      3 in 10 self-invented jobs are minute jobs; none failed; daily results keep arriving. If minute
+      jobs fail or crowd out daily ones, set `search.tracks: {}` (a config edit, no restart needed).
+      When (b2b) item 3 bumps the minute version, the worker's minute runs restart from the presets.
 - [ ] Seed-noise estimate per tier; promotion must beat the champion by more than that noise.
       First number (2026-11-25 21:15): the nano champion's configuration over 15 seeds scores mean
       +0.022, sd 0.005, range +0.014..+0.031. The leaderboard champion is the best of those seeds, so

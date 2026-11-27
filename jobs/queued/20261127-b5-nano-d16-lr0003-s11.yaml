@@ -1,0 +1,8 @@
+id: 20261127-b5-nano-d16-lr0003-s11
+tier: nano
+kind: train
+model: {lookback: 256, patch: 4, stride: 2, d_model: 16, n_blocks: 3, kernel: 25, ffn: 2, dropout: 0.2}
+train: {lr: 0.0003}
+seed: 11
+note: half the champion's width scored +0.034 at the default lr (70f3), level with the full width there (+0.032 over 6 seeds); does it also hold at lr 0.0003 (compare x3, same seed, +0.0435)?
+origin: planner

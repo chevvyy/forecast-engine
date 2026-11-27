@@ -1,0 +1,7 @@
+id: 20261127-b8-minute2-mid-s13
+tier: mid
+kind: train
+config: loop_minute
+seed: 13
+note: seed re-run of the minute-2 mid preset (a8 +0.0298, one seed)
+origin: planner

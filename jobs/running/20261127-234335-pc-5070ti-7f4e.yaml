@@ -1,0 +1,21 @@
+tier: large
+kind: distill
+model:
+  d_model: 384
+  dropout: 0.3
+  ffn: 2
+  kernel: 15
+  lookback: 256
+  n_blocks: 4
+  patch: 8
+  stride: 4
+train:
+  batch_size: 2048
+  lr: 0.0003
+teacher: 20261127-e1-mid-born-again-k15-s11
+seed: 78066
+note: 'confirm champion 20261127-230440-pc-5070ti-c6bc: seed 3 of 3'
+id: 20261127-234335-pc-5070ti-7f4e
+origin: worker
+worker: pc-5070ti
+attempts: 1

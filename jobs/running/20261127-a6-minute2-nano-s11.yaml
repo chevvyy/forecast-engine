@@ -6,3 +6,5 @@ seed: 11
 note: 'first minute-2 run on real bars: time-of-day inputs and the HAR time-of-day
   baseline. Check pinball.vol_har_tod against vol_har before reading the score'
 origin: planner
+worker: pc-5070ti
+attempts: 1

@@ -14,6 +14,8 @@ train:
   batch_size: 2048
   lr: 0.0003
 seed: 11
-note: does kernel 9 still matter under the confirmed mid recipe (batch 2048, lr 0.0003)? compare a3, same
-  seed, +0.0356
+note: does kernel 9 still matter under the confirmed mid recipe (batch 2048, lr 0.0003)?
+  compare a3, same seed, +0.0356
 origin: planner
+worker: pc-5070ti
+attempts: 1

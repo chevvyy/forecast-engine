@@ -1,0 +1,145 @@
+{
+  "config": "loop",
+  "coverage_80": [
+    [
+      0.8075,
+      0.7948
+    ],
+    [
+      0.7955,
+      0.7855
+    ],
+    [
+      0.8046,
+      0.8001
+    ]
+  ],
+  "cpu_ms_per_forecast": 0.121,
+  "data_hash": "500294764fb3",
+  "device": "cuda",
+  "dm": {
+    "all": [
+      -11.756765359484167,
+      6.518397490571681e-32
+    ],
+    "ret": [
+      -6.515737069230741,
+      7.233358247697983e-11
+    ],
+    "vol": [
+      -13.209723058879131,
+      7.710759382165709e-40
+    ]
+  },
+  "eval_version": 2,
+  "finished": "2026-11-28T01:44:07+00:00",
+  "fits_tier": true,
+  "folds": [
+    {
+      "best_epoch": 10.0,
+      "best_step": 14730,
+      "epochs": 15,
+      "es_pinball": 0.23479019105434418,
+      "n_train": 753990,
+      "n_val": 93975,
+      "peak_vram_gb": 0.629,
+      "steps": 22095
+    },
+    {
+      "best_epoch": 7.0,
+      "best_step": 11466,
+      "epochs": 12,
+      "es_pinball": 0.24212084710597992,
+      "n_train": 838233,
+      "n_val": 94394,
+      "peak_vram_gb": 0.639,
+      "steps": 19656
+    },
+    {
+      "best_epoch": 12.0,
+      "best_step": 21636,
+      "epochs": 15,
+      "es_pinball": 0.24456743896007538,
+      "n_train": 922663,
+      "n_val": 95360,
+      "peak_vram_gb": 0.651,
+      "steps": 27045
+    }
+  ],
+  "git": "942b2ba4",
+  "gpu": "NVIDIA GeForce RTX 5070 Ti",
+  "horizons": [
+    1,
+    5,
+    20
+  ],
+  "id": "20261127-g8-prune70-c1-nano-teacher-b1",
+  "job": {
+    "attempts": 1,
+    "id": "20261127-g8-prune70-c1-nano-teacher-b1",
+    "init_from": "20261127-c1-distil-b1-nano-s11",
+    "kind": "prune",
+    "note": "same on nano: 50% with the teacher (f6) scored +0.0474 against c1's +0.0478. 70% of 19k weights leaves about 6k, the phone tier's direction",
+    "origin": "planner",
+    "seed": 11,
+    "sparsity": 0.7,
+    "teacher": "20261127-b1-mid-k9-batch2048-lr0003-s12",
+    "tier": "nano",
+    "train": {
+      "lr": 0.0003,
+      "max_epochs": 15
+    },
+    "worker": "pc-5070ti"
+  },
+  "kind": "prune",
+  "minutes": 5.58,
+  "model": {
+    "d_model": 32,
+    "dropout": 0.2,
+    "ffn": 2,
+    "kernel": 25,
+    "lookback": 256,
+    "n_blocks": 3,
+    "patch": 4,
+    "stride": 2
+  },
+  "nonzero_params": 6305,
+  "onnx_bytes": 94309,
+  "onnx_max_abs_diff": 2.384185791015625e-07,
+  "params": 19454,
+  "peak_vram_gb": 0.651,
+  "pinball": {
+    "ret_baseline": 0.3055918514728546,
+    "ret_model": 0.29955947399139404,
+    "vol_baseline": 0.19298601150512695,
+    "vol_har": 0.19298601150512695,
+    "vol_model": 0.1797843724489212,
+    "vol_unconditional": 0.20153072476387024
+  },
+  "rank_ic_h1": -0.0005811905648877869,
+  "score": 0.04407361149787903,
+  "skill_ret": 0.019739985466003418,
+  "skill_vol": 0.06840723752975464,
+  "status": "ok",
+  "symbols": 539,
+  "tab": [
+    "log_rv5_rv20",
+    "log_rv60_rv20"
+  ],
+  "tier": "nano",
+  "train": {
+    "batch_size": 512,
+    "distill_alpha": 0.5,
+    "grad_clip": 1.0,
+    "lr": 0.0003,
+    "max_epochs": 15,
+    "patience": 5,
+    "weight_decay": 0.0001
+  },
+  "universe": {
+    "note": "current index members and megacaps: survivorship bias, return skill is optimistic",
+    "requested": 539
+  },
+  "vol_baseline": "har",
+  "worker": "pc-5070ti"
+}

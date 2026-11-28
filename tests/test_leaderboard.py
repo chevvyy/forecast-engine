@@ -1,7 +1,7 @@
 """The configuration board: seed means next to the single-run board."""
 import math
 
-from forecast.loop.leaderboard import champions, configurations, render
+from forecast.loop.leaderboard import champions, configurations, promoted, promotion_settings, render
 
 
 def _run(i, score, seed, tier="nano", ver=2, d_model=24, lr=0.001, **job):
@@ -50,3 +50,42 @@ def test_a_configuration_is_shape_settings_teacher_and_parent_and_needs_differen
     more = res + [{**_run(11, 0.04, 3), "kind": "distill"}]
     (c,) = configurations(more, 2)
     assert [r["id"] for r in c["runs"]] == ["r1", "r11"] and math.isclose(c["mean"], 0.03)
+
+
+def _seeds(first, scores, **kw):
+    return [_run(first + k, s, k + 1, **kw) for k, s in enumerate(scores)]
+
+
+def test_a_tier_changes_hands_only_by_more_than_the_seed_noise():
+    """2026-11-28: the board gave mid to a prune at +0.0454 over the +0.0437 it was pruned from (seed sd
+    0.002) and the minute nano tier to a mutation whose two re-runs averaged one sd above the old one."""
+    a = _seeds(1, [0.030, 0.032, 0.034])                       # mean 0.032, sd 0.002: first confirmed
+    b = _seeds(4, [0.033, 0.035, 0.037], d_model=32)           # +0.003: inside 2 x 0.002 x sqrt(2/3) = 0.0033
+    c = _seeds(7, [0.036, 0.038, 0.040], d_model=48)           # +0.006 over a: takes the tier
+    lucky = [_run(10, 0.060, 1, d_model=16), _run(11, 0.020, 2, d_model=16)]   # best single run, 2 seeds
+    held = promoted(a + b + lucky, 2)
+    assert champions(a + b + lucky, 2)["nano"]["id"] == "r10"  # the single-run board is unchanged
+    h = held["nano"]
+    assert h["best"]["id"] == "r3" and h["n"] == 3 and math.isclose(h["noise"], 0.002)
+    assert math.isclose(h["margin"], 2 * 0.002 * math.sqrt(2 / 3))
+    assert [x["best"]["id"] for x in h["challengers"]] == ["r6"]   # higher mean, not shown to be better
+    assert promoted(a + b + c + lucky, 2)["nano"]["best"]["id"] == "r9"
+    assert promoted(a + b, 2, z=1.0)["nano"]["best"]["id"] == "r6"  # a lower bar lets b through
+    # Order of confirmation, not of score: c confirmed first holds the tier, and b (lower) never takes it;
+    # a holder is compared with each newcomer, so b inside the margin of a does not shield a from c.
+    assert promoted(c + [{**r, "id": r["id"] + "x", "finished": "2026-11-27T09:00:00+00:00"} for r in a + b],
+                    2)["nano"]["best"]["id"] == "r9"
+    # More seeds narrow the margin: the same means with six seeds each are a step.
+    six = promoted(_seeds(1, [0.030, 0.032, 0.034, 0.030, 0.032, 0.034])
+                   + _seeds(11, [0.033, 0.035, 0.037, 0.033, 0.035, 0.037], d_model=32), 2)
+    assert six["nano"]["best"]["id"] == "r13" and six["nano"]["n"] == 6
+    # Per tier and per evaluation version; a tier without a confirmed configuration is absent, and
+    # with fewer than 2 seeds required (or a senseless z) there is no noise to speak of: nothing is held.
+    assert set(promoted(a + _seeds(30, [0.01, 0.02], tier="mid"), 2)) == {"nano"}
+    assert promoted(a, 1) == {} and promoted(a, 2, min_seeds=1) == {} and promoted(a, 2, z=math.nan) == {}
+    assert promoted(a, 2, min_seeds=4) == {}
+    text = render(a + b + lucky, 2)
+    assert "## Tier holders after seed noise" in text and "| r6 (+0.0350 over 3) |" in text
+    assert "Tier holders" not in render(lucky, 2)
+    assert promotion_settings({"search": {"confirm_seeds": 4, "promote_z": 1.5}}) == (4, 1.5)
+    assert promotion_settings({}) == (3, 2.0) == promotion_settings({"search": {"confirm_seeds": "x", "promote_z": []}})

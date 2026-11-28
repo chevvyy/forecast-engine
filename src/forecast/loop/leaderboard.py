@@ -94,6 +94,69 @@ def configurations(results: list[dict], eval_version: int | str | None = None, m
     return sorted(out, key=lambda c: -c["mean"])
 
 
+# A configuration takes a tier over only if its seed mean beats the holder's by more than this many
+# standard errors of the difference of two seed means (``search.promote_z`` overrides).
+PROMOTE_Z = 2.0
+
+
+def promoted(results: list[dict], eval_version: int | str | None = None, min_seeds: int = 3,
+             z: float = PROMOTE_Z) -> dict[str, dict]:
+    """Per tier, the configuration that holds it once seed noise is taken into account.
+
+    ``champions`` gives a tier to the best single run, which is the luckiest seed of everything tried,
+    and to a configuration whose mean is 0.001 above another's although one seed moves a score by
+    0.002 to 0.004. Here a configuration counts only once it has ``min_seeds`` different seeds, and it
+    takes the tier from the holder only if its seed mean is higher by more than
+    ``z * noise * sqrt(1/n_new + 1/n_holder)``, the standard error of the difference of the two means.
+    ``noise`` is the MEDIAN seed sd of the tier's confirmed configurations: one sd from 3 seeds is too
+    rough to use alone (0.0002 to 0.010 on 2026-11-27), and the median keeps one unstable configuration
+    from setting the bar for all the others.
+
+    Nothing is stored: configurations are taken in the order in which their ``min_seeds``-th seed
+    finished, the first one holds the tier, and each later one is compared with the holder of that
+    moment using the means over all seeds on record now. So the answer can depend on the order (a
+    configuration just inside the margin never takes over, and a later one must beat the holder, not
+    it), which is what a threshold means. The first run of a configuration that topped the single-run
+    board is part of its mean, so a mean still flatters a configuration found by search; ``z`` = 2
+    leaves room for that. A tier without a confirmed configuration is absent from the result.
+    Each value is the ``configurations`` entry plus ``noise``, ``margin`` (what the next challenger of
+    the same seed count must exceed) and ``challengers`` (confirmed, higher mean, inside the margin)."""
+    if min_seeds < 2 or not math.isfinite(z) or z < 0:
+        return {}
+    confs = configurations(results, eval_version, min_seeds=min_seeds)
+    out: dict[str, dict] = {}
+    for t in TIERS:
+        cs = sorted((c for c in confs if c["tier"] == t),
+                    key=lambda c: (str(c["runs"][min_seeds - 1].get("finished", "")), str(c["runs"][0].get("id"))))
+        if not cs:
+            continue
+        noise = statistics.median(c["sd"] for c in cs)
+        def margin(a: dict, b: dict, noise: float = noise) -> float:
+            return z * noise * math.sqrt(1 / a["n"] + 1 / b["n"])
+        holder = cs[0]
+        for c in cs[1:]:
+            if c["mean"] > holder["mean"] + margin(c, holder):
+                holder = c
+        out[t] = {**holder, "noise": noise, "margin": margin(holder, holder),
+                  "challengers": [c for c in cs if c is not holder and c["mean"] > holder["mean"]]}
+    return out
+
+
+def promotion_settings(cfg: dict) -> tuple[int, float]:
+    """``(min_seeds, z)`` for ``promoted`` from a track's config: ``search.confirm_seeds`` (the seeds a
+    champion is re-run to anyway) and ``search.promote_z``. Anything unreadable gives the defaults."""
+    s = cfg.get("search") if isinstance(cfg.get("search"), dict) else {}
+    try:
+        seeds = int(s.get("confirm_seeds", 3))
+    except (TypeError, ValueError):
+        seeds = 3
+    try:
+        z = float(s.get("promote_z", PROMOTE_Z))
+    except (TypeError, ValueError):
+        z = PROMOTE_Z
+    return seeds, z
+
+
 def _made_by(r: dict) -> str:
     job = r.get("job") if isinstance(r.get("job"), dict) else {}
     if job.get("init_from"):
@@ -101,7 +164,8 @@ def _made_by(r: dict) -> str:
     return f"distilled from {job['teacher']}" if job.get("teacher") else "trained directly"
 
 
-def render(results: list[dict], eval_version: int | None = None) -> str:
+def render(results: list[dict], eval_version: int | None = None, min_seeds: int = 3,
+           z: float = PROMOTE_Z) -> str:
     ok = [r for r in results if r.get("status") == "ok"
           and (eval_version is None or r.get("eval_version", 1) == eval_version)]
     ch = champions(results, eval_version)
@@ -146,6 +210,22 @@ def render(results: list[dict], eval_version: int | None = None) -> str:
             lines += [f"| {c['mean']:+.4f} | {c['sd']:.4f} | {c['n']} | {c['min']:+.4f} | {c['max']:+.4f} "
                       f"| {c['skill_ret']:+.4f} | {c['skill_vol']:+.4f} | {c['best']['id']} | {_made_by(c['best'])} |"
                       for c in top]
+    held = promoted(results, eval_version, min_seeds, z)
+    if held:
+        lines += ["", "## Tier holders after seed noise", "",
+                  f"The configuration that holds each tier when a newcomer needs {min_seeds} seeds and a seed mean",
+                  f"above the holder's by more than {z:g} standard errors of the difference (noise = median seed",
+                  "sd of the tier's confirmed configurations). Workers mutate, distil and prune from these, not",
+                  "from the luckiest single run. 'Inside the margin' lists confirmed configurations with a higher",
+                  "mean that did not clear it: not shown to be better, not shown to be worse.", "",
+                  "| Tier | Mean score | sd | Seeds | Best run | How it was made | Noise | Margin | Inside the margin |",
+                  "|---|---|---|---|---|---|---|---|---|"]
+        for t in TIERS:
+            if t in held:
+                h = held[t]
+                inside = ", ".join(f"{c['best']['id']} ({c['mean']:+.4f} over {c['n']})" for c in h["challengers"])
+                lines.append(f"| {t} | {h['mean']:+.4f} | {h['sd']:.4f} | {h['n']} | {h['best']['id']} "
+                             f"| {_made_by(h['best'])} | {h['noise']:.4f} | {h['margin']:.4f} | {inside or '-'} |")
     return "\n".join(lines) + "\n"
 
 
@@ -157,8 +237,9 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="loop", help="track: loop (daily, default) or e.g. loop_minute")
     name = ap.parse_args().config
-    ver = load_cfg(REPO, name)["eval"].get("version", 1)
-    text = render(load_results(), ver)
+    cfg = load_cfg(REPO, name)
+    ver = cfg["eval"].get("version", 1)
+    text = render(load_results(), ver, *promotion_settings(cfg))
     # One file per track, so minute and daily scores are never read side by side as if comparable.
     out = "LEADERBOARD.md" if name == "loop" else f"LEADERBOARD_{name.removeprefix('loop_')}.md"
     (REPO / "experiments" / out).write_text(text, encoding="utf-8")

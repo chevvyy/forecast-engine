@@ -89,3 +89,4 @@ search:
   p_distill: 0.1
   p_prune: 0.15
   confirm_seeds: 3         # a champion is re-run to this many seeds before it is mutated (configs/loop.yaml)
+  promote_z: 2.0           # margin, in standard errors, by which a confirmed configuration takes a tier (configs/loop.yaml)

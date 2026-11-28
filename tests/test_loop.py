@@ -384,6 +384,42 @@ def test_a_champion_is_rerun_with_new_seeds_before_it_is_mutated(tmp_path):
     assert rerun({**mid, "tier": "huge"}, res, cfg, tmp_path) is None
 
 
+def test_mutations_start_from_the_tier_holder_not_from_a_champion_inside_the_noise(tmp_path):
+    """Seed-noise backlog line, part 5 (2026-11-28). A configuration that tops the single-run board is
+    re-run to three seeds; it becomes what the worker mutates only if its mean then beats the holder's
+    by more than the noise (``leaderboard.promoted``)."""
+    from forecast.loop.worker import propose
+
+    cfg = yaml.safe_load((ROOT / "configs" / "loop.yaml").read_text())
+    cfg["search"].update(p_distill=0.0, p_prune=0.0, tracks={})
+
+    def seeds(name, scores, hour, **job):
+        return [{**_fake_result(f"{name}{k}", "nano", cfg, s, seed=k + 1, **job),
+                 "finished": f"2026-11-28T{hour:02d}:0{k}:00+00:00"} for k, s in enumerate(scores)]
+
+    old = seeds("a", [0.030, 0.032, 0.034], 1)
+    near = seeds("b", [0.036, 0.033, 0.0335], 2, model={"kernel": 15})     # champion run b0; mean +0.002
+    res = old + near
+    assert champions(res, cfg["eval"]["version"])["nano"]["id"] == "b0"
+    for k in range(20):
+        job = propose(cfg, res, ["nano"], random.Random(k), tmp_path)
+        assert job["note"] == "mutation of a2", job                         # the best run of a
+    far = seeds("c", [0.045, 0.046, 0.047], 3, model={"kernel": 25})
+    assert propose(cfg, res + far, ["nano"], random.Random(0), tmp_path)["note"] == "mutation of c2"
+    # A new champion with one seed is confirmed first, as before; and with the re-runs switched off
+    # there is no seed noise to gate on, so the single-run champion is mutated as before 2026-11-27.
+    top = _fake_result("d0", "nano", cfg, 0.09, seed=1, model={"kernel": 5})
+    assert propose(cfg, res + [top], ["nano"], random.Random(0), tmp_path)["note"].startswith("confirm champion d0")
+    off = yaml.safe_load(yaml.safe_dump(cfg))
+    off["search"]["confirm_seeds"] = 1
+    assert propose(off, res, ["nano"], random.Random(0), tmp_path)["note"] == "mutation of b0"
+    # Worker-written data: a confirmed "configuration" whose result has no model is not built upon.
+    # (j is confirmed first and nothing later clears its margin, so it holds the tier.)
+    junk = [{**r, "model": 3, "job": {**r["job"], "model": {"kernel": 51}}}
+            for r in seeds("j", [0.033, 0.033, 0.0335], 0)]
+    assert propose(cfg, res + junk, ["nano"], random.Random(0), tmp_path)["note"] == "mutation of b0"
+
+
 def test_proposed_shapes_fit_the_tier_vram():
     """A 255-token, d_model 512, 8-block mutation cannot train in 16 GB at batch 512; proposing it
     costs a failed or spilled run every time (2026-11-26)."""

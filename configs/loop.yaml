@@ -77,6 +77,11 @@ search:
   # Before a worker mutates a tier's champion it re-runs the champion's own configuration until it has
   # this many seeds (worker.rerun): the champion is the best single run, so the luckiest seed. 1 = off.
   confirm_seeds: 3
+  # A configuration with that many seeds takes its tier (becomes what workers mutate, distil from and
+  # prune) only if its seed mean beats the holder's by more than this many standard errors of the
+  # difference, with the tier's median seed sd as the noise (leaderboard.promoted). The best single run
+  # is still shown as champion. confirm_seeds: 1 switches this off together with the re-runs.
+  promote_z: 2.0
   # Share of self-invented jobs a worker gives to another track (configs/<name>.yaml), if it can load
   # that track's bars (minute bars need Alpaca keys in .env; a worker without them stays daily). The job
   # is invented from that track's own champions and `search` grid and scored on its own board. By count,

@@ -21,7 +21,7 @@ from pathlib import Path
 import yaml
 
 from forecast.data import alpaca
-from forecast.loop.leaderboard import champions, load_results
+from forecast.loop.leaderboard import champions, load_results, promoted, promotion_settings
 from forecast.loop.run_job import artifact_dir, job_cfg, load_cfg, run_job
 from forecast.models.patchnet import train_vram_gb
 from forecast.utils.common import REPO, device_info, release_vram, write_json
@@ -254,8 +254,10 @@ def propose(cfg: dict, results: list[dict], tiers: list[str], rng: random.Random
     ``CONFIRM_SEEDS`` seeds is run again with a new seed (``rerun``): a champion is the best of many
     single runs, and until 2026-11-27 the worker mutated it for hours before the planner's seed re-runs
     said whether it was a step or a lucky draw. Failed runs count as seeds tried, so a configuration that
-    cannot be re-run is given up after the same number of attempts. Otherwise:
-    mutate the tier champion (keeping how it was trained, see
+    cannot be re-run is given up after the same number of attempts. Otherwise, starting from the
+    tier's holder after seed noise (``leaderboard.promoted``; the single-run champion while no
+    configuration of the tier has that many seeds):
+    mutate it (keeping how it was trained, see
     ``recipe``), or distil a bigger champion into a smaller tier, or prune-and-finetune the champion.
     Every proposal carries a seed. A proposal is
     dropped and redrawn if the same job already has a result, if it is a distil / prune configuration
@@ -296,6 +298,12 @@ def propose(cfg: dict, results: list[dict], tiers: list[str], rng: random.Random
         job["seed"] = rng.choice([s for s in rng.sample(range(10**6), k=len(tried) + 1) if s not in tried])
         job["note"] = f"confirm champion {champ_id}: seed {len(tried) + 1} of {need}"
         return job
+    # What is mutated, distilled from and pruned is the tier's holder after seed noise, where there is
+    # one (``leaderboard.promoted``): a new single-run champion is re-run above first, and its
+    # configuration replaces the holder only if its seed mean is higher by more than the noise. Until
+    # 2026-11-28 the search moved to whatever single run topped the board, by any margin.
+    held = promoted(results, ver, *promotion_settings(cfg))
+    ch = {**ch, **{t: h["best"] for t, h in held.items() if t in ch and isinstance(h["best"].get("model"), dict)}}
     tier = rng.choice(tiers)
     rec = recipe(ch[tier], results, cfg, repo)
     for _ in range(20):

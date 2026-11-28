@@ -1,0 +1,21 @@
+tier: mid
+kind: distill
+model:
+  d_model: 64
+  dropout: 0.2
+  ffn: 1
+  kernel: 15
+  lookback: 256
+  n_blocks: 3
+  patch: 4
+  stride: 2
+train:
+  lr: 0.0003
+  batch_size: 2048
+note: mutation of 20261127-e1-mid-born-again-k15-s11
+teacher: 20261127-b1-mid-k9-batch2048-lr0003-s12
+seed: 699906
+id: 20261128-094429-pc-5070ti-7045
+origin: worker
+worker: pc-5070ti
+attempts: 1

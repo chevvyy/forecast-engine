@@ -16,3 +16,5 @@ train:
 seed: 11
 note: 'the other side of h7: teacher weight 0.25'
 origin: planner
+worker: pc-5070ti
+attempts: 1

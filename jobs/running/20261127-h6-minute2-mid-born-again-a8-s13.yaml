@@ -6,3 +6,5 @@ teacher: 20261127-a8-minute2-mid-s11
 seed: 13
 note: fifth seed of the same configuration as h5
 origin: planner
+worker: pc-5070ti
+attempts: 1

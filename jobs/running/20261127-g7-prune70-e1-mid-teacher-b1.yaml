@@ -9,6 +9,9 @@ train:
   max_epochs: 15
   batch_size: 2048
 seed: 11
-note: 'second sparsity level with the teacher kept: 50% (f5) lost nothing, +0.0454 and +0.0453 on 2 seeds
-  against the parent configuration''s +0.0437. Where does it start to cost'
+note: 'second sparsity level with the teacher kept: 50% (f5) lost nothing, +0.0454
+  and +0.0453 on 2 seeds against the parent configuration''s +0.0437. Where does it
+  start to cost'
 origin: planner
+worker: pc-5070ti
+attempts: 1

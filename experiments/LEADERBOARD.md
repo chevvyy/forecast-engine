@@ -1,6 +1,6 @@
 # Leaderboard
 
-Evaluation version 2: 211 finished runs. All versions: 1955 runs recorded, 1065 failed, 679 finished under other versions (not comparable, not shown).
+Evaluation version 2: 231 finished runs. All versions: 1985 runs recorded, 1065 failed, 689 finished under other versions (not comparable, not shown).
 Skill = 1 - model pinball / best-baseline pinball on purged walk-forward validation folds.
 Positive means better than the baseline. The final holdout is not used here.
 Every run in this table was selected on the same validation folds, so the best score is
@@ -41,8 +41,8 @@ biased upward by the number of runs tried; only the final holdout settles it.
 | mid | 20261127-193302-pc-5070ti-b86c | +0.0437 | +0.0142 | +0.0732 | 0.000 | 61,534 | 256 | 0.233 | 1.113 |
 | mid | 20261127-f2-mid-k15-distil-e1-s11 | +0.0437 | +0.0136 | +0.0738 | 0.000 | 61,534 | 256 | 0.236 | 1.268 |
 | mid | 20261128-003347-pc-5070ti-5697 | +0.0436 | +0.0135 | +0.0737 | 0.000 | 79,262 | 329 | 0.306 | 1.566 |
-| mid | 20261128-002948-pc-5070ti-9797 | +0.0423 | +0.0141 | +0.0706 | 0.000 | 66,142 | 274 | 0.137 | 0.518 |
-| mid | 20261127-e2-mid-born-again-k15-s12 | +0.0416 | +0.0128 | +0.0704 | 0.000 | 61,534 | 256 | 0.232 | 1.269 |
+| mid | 20261128-004346-pc-5070ti-add5 | +0.0431 | +0.0139 | +0.0722 | 0.000 | 43,678 | 187 | 0.264 | 0.972 |
+| mid | 20261128-030748-pc-5070ti-99c1 | +0.0429 | +0.0134 | +0.0723 | 0.000 | 129,150 | 521 | 0.359 | 1.845 |
 
 ## Top large runs
 
@@ -50,6 +50,7 @@ biased upward by the number of runs tried; only the final holdout settles it.
 |---|---|---|---|---|---|---|---|---|---|
 | large | 20261127-230440-pc-5070ti-c6bc | +0.0486 | +0.0192 | +0.0780 | 0.000 | 2,450,718 | 9593 | 1.708 | 6.339 |
 | large | 20261127-f3-large-distil-e1-s11 | +0.0468 | +0.0160 | +0.0776 | 0.000 | 2,450,718 | 9593 | 1.718 | 6.339 |
+| large | 20261128-032807-pc-5070ti-4cf6 | +0.0464 | +0.0166 | +0.0761 | 0.000 | 2,450,718 | 9593 | 1.663 | 2.0 |
 | large | 20261127-234335-pc-5070ti-7f4e | +0.0457 | +0.0157 | +0.0758 | 0.000 | 2,450,718 | 9593 | 1.831 | 6.339 |
 | large | 20261127-f7-prune50-161c-large-teacher-b1 | +0.0451 | +0.0151 | +0.0752 | 0.000 | 2,450,718 | 9593 | 1.729 | 6.348 |
 | large | 20261127-f1-large-distil-b1-s13 | +0.0451 | +0.0150 | +0.0752 | 0.000 | 2,450,718 | 9593 | 1.766 | 6.338 |
@@ -57,7 +58,6 @@ biased upward by the number of runs tried; only the final holdout settles it.
 | large | 20261127-f4-large-born-again-161c-s11 | +0.0435 | +0.0131 | +0.0739 | 0.000 | 2,450,718 | 9593 | 1.714 | 6.333 |
 | large | 20261127-183754-pc-5070ti-6f42 | +0.0434 | +0.0143 | +0.0724 | 0.000 | 4,842,270 | 18948 | 3.363 | 9.895 |
 | large | 20261127-e6-large-c6-distil-b1-s11 | +0.0433 | +0.0142 | +0.0725 | 0.000 | 2,450,718 | 9593 | 1.582 | 6.339 |
-| large | 20261127-173032-pc-5070ti-cbfc | +0.0423 | +0.0111 | +0.0734 | 0.000 | 2,506,014 | 9809 | 2.639 | 6.34 |
 
 ## Configurations by seed mean
 
@@ -86,12 +86,12 @@ noise. Up to 10 per tier. Still selected on the validation folds, like everythin
 | +0.0437 | 0.0019 | 3 | +0.0416 | +0.0452 | +0.0141 | +0.0733 | 20261127-e1-mid-born-again-k15-s11 | distilled from 20261127-b1-mid-k9-batch2048-lr0003-s12 |
 | +0.0405 | 0.0007 | 2 | +0.0400 | +0.0410 | +0.0116 | +0.0695 | 20261127-e3-mid-born-again-b1-s12 | distilled from 20261127-b1-mid-k9-batch2048-lr0003-s12 |
 | +0.0375 | 0.0017 | 3 | +0.0356 | +0.0387 | +0.0094 | +0.0656 | 20261127-b1-mid-k9-batch2048-lr0003-s12 | trained directly |
+| +0.0365 | 0.0046 | 2 | +0.0332 | +0.0397 | +0.0070 | +0.0659 | 20261127-g2-mid-b1-evals4-s11 | trained directly |
 | +0.0306 | 0.0035 | 3 | +0.0284 | +0.0346 | +0.0013 | +0.0598 | 20261127-a2-mid-k9-batch2048-s13 | trained directly |
 | +0.0165 | 0.0032 | 4 | +0.0117 | +0.0185 | -0.0116 | +0.0445 | 20261126-y5-mid-champ-s12 | trained directly |
 | +0.0151 | 0.0099 | 4 | +0.0009 | +0.0221 | -0.0208 | +0.0511 | 20261126-192624-pc-5070ti-066b | trained directly |
 | +0.0137 | 0.0024 | 2 | +0.0120 | +0.0153 | -0.0281 | +0.0554 | 20261127-040002-pc-5070ti-913f | trained directly |
 | +0.0046 | 0.0076 | 2 | -0.0007 | +0.0100 | -0.0269 | +0.0361 | 20261126-155436-pc-5070ti-9b79 | trained directly |
-| -0.0180 | 0.0040 | 2 | -0.0208 | -0.0152 | -0.0734 | +0.0374 | 20261126-w3-mid-v1champ-s11 | trained directly |
 
 ### large
 
@@ -107,3 +107,17 @@ noise. Up to 10 per tier. Still selected on the validation folds, like everythin
 | +0.0083 | 0.0017 | 2 | +0.0070 | +0.0095 | -0.0340 | +0.0506 | 20261126-151135-pc-5070ti-725a | trained directly |
 | +0.0035 | 0.0033 | 2 | +0.0012 | +0.0059 | -0.0381 | +0.0451 | 20261126-104349-pc-5070ti-1662 | trained directly |
 | -0.0035 | 0.0010 | 3 | -0.0046 | -0.0026 | -0.0553 | +0.0483 | 20261126-162920-pc-5070ti-7c2a | prune 0.5 of 20261126-151135-pc-5070ti-725a |
+
+## Tier holders after seed noise
+
+The configuration that holds each tier when a newcomer needs 3 seeds and a seed mean
+above the holder's by more than 2 standard errors of the difference (noise = median seed
+sd of the tier's confirmed configurations). Workers mutate, distil and prune from these, not
+from the luckiest single run. 'Inside the margin' lists confirmed configurations with a higher
+mean that did not clear it: not shown to be better, not shown to be worse.
+
+| Tier | Mean score | sd | Seeds | Best run | How it was made | Noise | Margin | Inside the margin |
+|---|---|---|---|---|---|---|---|---|
+| nano | +0.0467 | 0.0014 | 3 | 20261127-c1-distil-b1-nano-s11 | distilled from 20261127-b1-mid-k9-batch2048-lr0003-s12 | 0.0037 | 0.0060 | 20261127-160602-pc-5070ti-5167 (+0.0468 over 3) |
+| mid | +0.0437 | 0.0019 | 3 | 20261127-e1-mid-born-again-k15-s11 | distilled from 20261127-b1-mid-k9-batch2048-lr0003-s12 | 0.0026 | 0.0042 | 20261128-002357-pc-5070ti-aab0 (+0.0454 over 3) |
+| large | +0.0470 | 0.0015 | 3 | 20261127-230440-pc-5070ti-c6bc | distilled from 20261127-e1-mid-born-again-k15-s11 | 0.0014 | 0.0023 | - |

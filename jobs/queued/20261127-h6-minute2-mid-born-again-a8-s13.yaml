@@ -1,0 +1,8 @@
+id: 20261127-h6-minute2-mid-born-again-a8-s13
+tier: mid
+config: loop_minute
+kind: distill
+teacher: 20261127-a8-minute2-mid-s11
+seed: 13
+note: fifth seed of the same configuration as h5
+origin: planner

@@ -1,0 +1,18 @@
+id: 20261127-h8-nano-distil-b1-alpha025-s11
+tier: nano
+kind: distill
+teacher: 20261127-b1-mid-k9-batch2048-lr0003-s12
+model:
+  lookback: 256
+  patch: 4
+  stride: 2
+  d_model: 32
+  n_blocks: 3
+  kernel: 25
+  ffn: 2
+  dropout: 0.2
+train:
+  distill_alpha: 0.25
+seed: 11
+note: 'the other side of h7: teacher weight 0.25'
+origin: planner

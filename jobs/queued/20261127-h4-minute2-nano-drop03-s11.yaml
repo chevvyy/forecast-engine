@@ -1,0 +1,10 @@
+id: 20261127-h4-minute2-nano-drop03-s11
+tier: nano
+config: loop_minute
+kind: distill
+teacher: 20261127-a8-minute2-mid-s11
+model:
+  dropout: 0.3
+seed: 11
+note: 'the other half of h3: dropout 0.3 alone, patch 4. Same seed and teacher as d8 (+0.0300)'
+origin: planner

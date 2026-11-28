@@ -1,0 +1,18 @@
+id: 20261127-h2-minute2-nano-patch16-drop03-s12
+tier: nano
+config: loop_minute
+kind: distill
+teacher: 20261127-a8-minute2-mid-s11
+model:
+  d_model: 24
+  dropout: 0.3
+  ffn: 2
+  kernel: 9
+  lookback: 60
+  n_blocks: 2
+  patch: 16
+  stride: 8
+train: {}
+seed: 12
+note: fifth seed of the same configuration as h1
+origin: planner

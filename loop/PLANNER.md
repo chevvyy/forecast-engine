@@ -36,6 +36,10 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
    what was learned). Include the total number of configurations tried so far.
    Take "its configuration scores X over n seeds" from the board's "Configurations by seed mean"
    section, not from the single-run tables: a tier's champion run is the luckiest seed tried.
+   The board's last section, "Tier holders after seed noise" (`leaderboard.promoted`, since 2026-11-27
+   21:15), names the configuration each tier's search starts from and the confirmed ones inside its
+   margin. Call a configuration "a step" in the log only if it took the tier there; one inside the
+   margin is "not shown to be better". More seeds on both sides narrow the margin: queue those.
    Once the minute track has results: `python -m forecast.loop.leaderboard --config loop_minute` too
    (`experiments/LEADERBOARD_minute.md`). Minute and daily scores are never compared with each other.
 4. **Decide the next experiments** from the results, and write 3-8 job files into `jobs/queued/`:
@@ -52,13 +56,15 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
 6. **Housekeeping.** Remove `models/<id>/` folders that are no longer champion or runner-up of a tier
    and are not the `teacher` / `init_from` of a job still in `jobs/queued/`.
    Champion and runner-up are per track and version (daily, minute, and the closed version 1). Also keep
-   the first run of a configuration the log calls confirmed across seeds, while it is the confirmed
-   one for its tier (since 2026-11-27 17:15: nano `20261127-c1-distil-b1-nano-s11`; mid
-   `20261127-e1-mid-born-again-k15-s11`; large `20261127-f3-large-distil-e1-s11`;
-   minute-2: nano `20261127-d8-minute2-distil-a8-nano-s11`, mid `20261127-a8-minute2-mid-s11`).
-   Keep a run that is the `teacher` or the pruned parent (`init_from`) of a tier's champion too (now
-   b1, teacher of mid aab0; e1, parent of aab0 and teacher of large c6bc; `20261127-155512-pc-5070ti-c1f5`,
-   teacher of nano 5167): a second worker could not re-run or mutate that champion without it.
+   the best run of each tier's holder ("Tier holders after seed noise" on the board: it is what workers
+   mutate, distil from and prune; this replaces the earlier "first run of the confirmed configuration"
+   rule. 2026-11-27 21:15: nano `20261127-c1-distil-b1-nano-s11`, mid
+   `20261127-e1-mid-born-again-k15-s11`, large c6bc; minute-2: nano b91f, mid
+   `20261127-a8-minute2-mid-s11`, large 34b6).
+   Keep a run that is the `teacher` or the pruned parent (`init_from`) of a tier's champion or holder
+   too (now b1, teacher of mid aab0 and of both the nano and mid holders; e1, parent of aab0 and teacher
+   of large c6bc; `20261127-155512-pc-5070ti-c1f5`, teacher of nano 5167; a8, teacher of the minute nano
+   and mid champions): a second worker could not re-run or mutate that champion without it.
    Keep `jobs/done/` and `results/` (they are the experiment record).
 7. **Push** to `loop`. If the push is rejected, `git pull --rebase` and retry; never force-push.
 8. **Tell Dev only when it matters:** a worker down > 6 h, the loop blocked on something only he can
@@ -249,7 +255,7 @@ Minute track: `minute-1` = unconditional and HAR baselines, no clock (2 runs, cl
       3 in 10 self-invented jobs are minute jobs; none failed; daily results keep arriving. If minute
       jobs fail or crowd out daily ones, set `search.tracks: {}` (a config edit, no restart needed).
       When (b2b) item 3 bumps the minute version, the worker's minute runs restart from the presets.
-- [ ] Seed-noise estimate per tier; promotion must beat the champion by more than that noise.
+- [x] Seed-noise estimate per tier; promotion must beat the champion by more than that noise.
       First number (2026-11-25 21:15): the nano champion's configuration over 15 seeds scores mean
       +0.022, sd 0.005, range +0.014..+0.031. The leaderboard champion is the best of those seeds, so
       its own score overstates the configuration by about 0.009. Not yet in code: the leaderboard
@@ -331,8 +337,49 @@ Minute track: `minute-1` = unconditional and HAR baselines, no clock (2 runs, cl
       A gain is a gain only beyond the configuration's seed sd (mid 0.002, nano 0.004, large 0.004).
       If it helps, the next steps are a re-trained teacher (b1's configuration with it) and then
       `evals_per_epoch` in the search grid; if not, write the null result down and leave the key unused.
-      Still open on this line: (5) [ ] promotion that requires beating the old champion by more than
-      the seed noise (the remaining half of the line's first sentence).
+      **Checked 2026-11-27 21:15 (g1 to g4): null result.** Paired with the once-per-epoch run of the
+      same seed: mid -0.0055 (g1 +0.0332 against b1 +0.0387) and +0.0041 (g2 +0.0397 against a3 +0.0356),
+      nano -0.0028 (g3 +0.0438 against z6 +0.0466), large +0.0027 (g4 +0.0270 against c6 +0.0243): mean
+      -0.0004, every difference within about 1.5 seed-sd of its configuration, two up and two down.
+      The mechanism did what it was built for only on large (every fold kept the check at half of the
+      first epoch, `best_epoch` 0.5); mid and nano kept points between 0.75 and 4.5 epochs. Cost 4% to
+      46% more minutes (large 16.6 against 15.9; mid 4.1 against 2.8). The key stays out of the search
+      grid and no job uses it; the code path stays (off by default, bit-identical).
+      (5) [x] promotion that requires beating the old champion by more than the seed noise (done
+      2026-11-27 21:15): `leaderboard.promoted` gives each tier a holder. A configuration counts once it
+      has `search.confirm_seeds` (3) different seeds and takes the tier only if its seed mean is above
+      the holder's by more than `search.promote_z` (2) x noise x sqrt(1/n_new + 1/n_holder), where noise
+      is the median seed sd of the tier's confirmed configurations. Nothing is stored: configurations
+      are taken in the order their third seed finished. `worker.propose` mutates, distils from and
+      prunes the holder's best run (the single-run champion while a tier has no confirmed
+      configuration, or with `confirm_seeds: 1`); a new single-run champion is still re-run to 3 seeds
+      first (part 3), is still shown as champion, and its checkpoints are still committed. The board
+      has a "Tier holders after seed noise" section. Proposals and display only: evaluation untouched,
+      no version bump. Judgement calls, mine: z = 2 (a configuration found by search has its lucky
+      first run in its mean); the median, not the pooled sd, because one unstable configuration (mid
+      066b, sd 0.010) would otherwise set the bar for the stable ones. That choice decides one case
+      today: large c6bc's configuration is 0.0030 above the b1-taught one, margin 0.0023 with the
+      median and 0.0031 pooled. Holders with the results of that hour: daily nano c1's configuration
+      (5167's is level, +0.0001), mid e1's (the 50% prune aab0, +0.0017, is inside the margin 0.0042),
+      large c6bc's; minute nano b91f's (4c4b's, +0.0041, is inside 0.0043), minute mid the a8 preset
+      (the born-again one, +0.0036, is inside 0.0057), minute large 34b6's. Known limits: order
+      dependence (a configuration just inside the margin never takes over, and the next one must beat
+      the holder, not it); a configuration with 2 finished seeds and a failed third is never confirmed;
+      minute mid mutations now start from a8 without a teacher until h5 / h6 settle the born-again
+      one. Only ever run on synthetic data. **Next cycle must check on the real machine:** the worker
+      restarted on this commit and results keep arriving; notes of new mutations name the holders
+      above (daily nano "mutation of 20261127-c1-distil-b1-nano-s11", mid "...e1-mid-born-again-k15-s11",
+      minute nano "...b91f", minute mid "...a8-minute2-mid-s11"), not the single-run champions; none
+      failed; a new single-run champion still gets its "confirm champion" re-runs. If the worker stalls
+      or errors on this, set `search.confirm_seeds: 1` in both configs (a config edit, no restart): that
+      switches the holder off and the re-runs with it.
+- [ ] **Worker prunes keep the teacher** (found 2026-11-27 13:10 to 21:15, small). `worker._draw` proposes
+      "prune + finetune champion" without a teacher, about 15% of self-invented jobs. Every such prune
+      of a distilled model lost 0.008 to 0.015 and all of its return skill (nano 5167 at 50%: +0.0329;
+      large c6bc at 70%: +0.0100), while the planner's prunes that kept the parent's teacher lost
+      nothing at 50% (mid +0.0454, nano +0.0474, large +0.0451) and about 0.003 at 70% (mid g7 +0.0425,
+      nano g8 +0.0441, one seed each). Give a prune proposal the parent's `teacher` when the recipe has
+      one (`worker.recipe` already follows `init_from`), with a test.
 - [ ] LightGBM quantile baseline on tabular features (the scaffold's "first real model"); deep models
       must be compared against it in every result. Bumps `eval.version`.
       Same version bump: a fairer return baseline. Returns are scaled by rv20 and the return baseline

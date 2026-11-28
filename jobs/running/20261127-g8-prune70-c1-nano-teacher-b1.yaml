@@ -8,6 +8,8 @@ train:
   lr: 0.0003
   max_epochs: 15
 seed: 11
-note: 'same on nano: 50% with the teacher (f6) scored +0.0474 against c1''s +0.0478. 70% of 19k weights
-  leaves about 6k, the phone tier''s direction'
+note: 'same on nano: 50% with the teacher (f6) scored +0.0474 against c1''s +0.0478.
+  70% of 19k weights leaves about 6k, the phone tier''s direction'
 origin: planner
+worker: pc-5070ti
+attempts: 1

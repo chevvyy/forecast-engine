@@ -154,3 +154,50 @@ def test_a_parent_from_before_the_clock_inputs_is_refused_with_a_clear_error():
     assert _same_inputs(m, 2, "old") is m
     with pytest.raises(ValueError, match="old was trained on 2 side inputs, this track has 4"):
         _same_inputs(m, 4, "old")
+
+
+def test_early_stopping_inside_the_epoch_looks_more_often_on_the_same_training_path():
+    """2026-11-26/27: on the 539-symbol universe an epoch is 370 to 1800 steps and 75 of 165 runs without
+    a teacher kept the weights of their first epoch in every fold. ``train.evals_per_epoch`` scores the
+    early-stopping slice inside the epoch too. Absent or 1, nothing changes."""
+    from forecast.training.trainer import eval_steps
+
+    assert eval_steps(1800) == eval_steps(1800, 1) == {1800}
+    assert eval_steps(1800, 4) == {450, 900, 1350, 1800}
+    assert eval_steps(10, 4) == {2, 5, 8, 10}
+    assert eval_steps(3, 8) == {1, 2, 3} and eval_steps(1, 4) == {1}     # never more points than steps
+    assert eval_steps(10, 2.0) == {5, 10}
+    for junk in (0, -2, 65, 2.5, float("nan"), "4", None, True, [4]):                   # the value can come from a job file
+        assert eval_steps(100, junk) == {100}, junk
+
+    tr, es = _data(1000, 6), _data(300, 7)
+    base = {"max_epochs": 3, "lr": 3e-3, "batch_size": 100, "patience": 99}
+
+    def run(cfg, deadline=None):
+        torch.manual_seed(0)
+        m = PatchNet(6, 2, 3, 5, lookback=32, d_model=16, n_blocks=1, dropout=0.1)
+        st = fit(m, tr, es, cfg, Q, "cpu", deadline=deadline)
+        loss = float(pinball_rows(es["y"], predict(m, es["X"], es["tab"], "cpu"), Q).mean())
+        return st, loss, m
+
+    one, loss1, m1 = run(base)
+    same, _, m1b = run({**base, "evals_per_epoch": 1})
+    assert one == same and all(torch.equal(a, b) for a, b in zip(m1.parameters(), m1b.parameters(), strict=True))
+    assert one["steps"] == 30 and one["best_step"] % 10 == 0 and one["best_epoch"] == one["best_step"] / 10
+    # Five looks per epoch: the same 30 steps (scoring draws no random numbers), every end-of-epoch
+    # point is among the 15 looked at, so the kept weights are at least as good on the slice, and they
+    # are the weights of the step the stats name.
+    five, loss5, _ = run({**base, "evals_per_epoch": 5})
+    assert five["steps"] == 30 and five["epochs"] == 3 and five["best_step"] % 2 == 0
+    assert five["es_pinball"] <= one["es_pinball"] + 1e-9
+    assert loss5 == pytest.approx(five["es_pinball"], abs=1e-6) and loss1 == pytest.approx(one["es_pinball"], abs=1e-6)
+    # Patience stays a number of epochs: 1 epoch without improvement = 5 looks. A learning rate of zero
+    # after the first look cannot improve, so training stops one epoch after the best point, mid-epoch.
+    stuck = {**base, "max_epochs": 40, "patience": 1, "evals_per_epoch": 5, "lr": 0.0}
+    st, _, _ = run(stuck)
+    assert st["best_step"] == 2 and st["steps"] == 12 and st["epochs"] == 2 and st["best_epoch"] == 0.2
+    st, _, _ = run({**stuck, "evals_per_epoch": 1})
+    assert st["best_step"] == 10 and st["steps"] == 20 and st["epochs"] == 2
+    # A deadline already passed: one step, one look, and the weights of that look are returned.
+    st, _, _ = run({**base, "evals_per_epoch": 5}, deadline=1.0)
+    assert st["steps"] == 1 and st["best_step"] == 1 and st["epochs"] == 1

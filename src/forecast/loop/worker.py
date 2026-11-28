@@ -116,6 +116,11 @@ def fits_vram(job: dict, cfg: dict) -> bool:
 
 # The training settings a mutation or seed re-run takes over from the champion (the ones in the grid).
 RECIPE_KEYS = ("lr", "weight_decay", "batch_size")
+# A training setting a job may carry although ``configs/*.yaml -> train`` has no default for it (absent
+# means once per epoch, and a default in the config would be recorded in every new result and split
+# its configuration from the runs before it on the leaderboard): how often per epoch the early-stopping
+# slice is scored (``trainer.eval_steps``). A champion trained with it is re-run and mutated with it.
+OPTIONAL_TRAIN_KEY = "evals_per_epoch"
 
 
 def recipe(champ: dict, results: list[dict], cfg: dict, repo: Path = REPO) -> dict:
@@ -143,6 +148,9 @@ def recipe(champ: dict, results: list[dict], cfg: dict, repo: Path = REPO) -> di
         run = by_id[parent]
     out: dict = {"train": {}}
     used = run.get("train") if isinstance(run.get("train"), dict) else {}
+    k = used.get(OPTIONAL_TRAIN_KEY)   # not in the grid (nothing mutates it); kept if it is a sane count
+    if isinstance(k, int) and not isinstance(k, bool) and 2 <= k <= 64:
+        out["train"][OPTIONAL_TRAIN_KEY] = k
     for key in RECIPE_KEYS:
         v = used.get(key)
         grid = (cfg.get("search") or {}).get(key)
@@ -183,7 +191,7 @@ def rerun(champ: dict, results: list[dict], cfg: dict, repo: Path = REPO) -> dic
           and r.get("status") == "ok" and r.get("eval_version", 1) == ver}
     kind = job.get("kind", "train")
     out: dict = {"tier": tier, "kind": kind if kind in ("train", "distill", "prune") else "train"}
-    for key, known in (("model", cfg["tiers"][tier]["model"]), ("train", cfg["train"])):
+    for key, known in (("model", cfg["tiers"][tier]["model"]), ("train", {**cfg["train"], OPTIONAL_TRAIN_KEY: 1})):
         part = job.get(key)
         if part is None:
             continue

@@ -276,6 +276,13 @@ def test_mutations_and_seed_reruns_keep_how_the_champion_was_trained(tmp_path):
     # A pruned champion was finetuned (lr 0.0003, 15 epochs); its recipe is that of the run it came from.
     pruned = result("m1", "mid", 0.05, kind="prune", init_from="m0", sparsity=0.5, train={"lr": 0.001, "max_epochs": 15})
     assert recipe(pruned, res + [pruned], cfg, tmp_path) == {"train": {"batch_size": 2048, "lr": 0.0003}}
+    # Early stopping inside the epoch is part of how a champion was trained, although nothing mutates it.
+    fine = result("m3", "mid", 0.09, train={"lr": 0.0003, "evals_per_epoch": 4})
+    assert recipe(fine, res + [fine], cfg, tmp_path) == {"train": {"evals_per_epoch": 4, "lr": 0.0003}}
+    assert propose(cfg, res + [fine], ["mid"], random.Random(3), tmp_path)["train"]["evals_per_epoch"] == 4
+    for junk in (1, 400, True, "4", 4.5):
+        odd = result("m4", "mid", 0.09, train={"evals_per_epoch": junk})
+        assert recipe(odd, res + [odd], cfg, tmp_path) == {"train": {}}, junk
     orphan = result("m2", "mid", 0.06, kind="prune", init_from="gone", sparsity=0.5, train={"batch_size": 2048})
     assert recipe(orphan, res + [orphan], cfg, tmp_path) == {"train": {}}
     loop = [result("a", "mid", 0.07, init_from="b"), result("b", "mid", 0.0, init_from="a")]
@@ -346,6 +353,13 @@ def test_a_champion_is_rerun_with_new_seeds_before_it_is_mutated(tmp_path):
     job = propose(cfg, res + [pruned], ["mid"], random.Random(0), tmp_path)
     assert (job["kind"], job["init_from"], job["sparsity"]) == ("prune", "m0", 0.5) and job["seed"] != 5
     assert job["train"] == {"lr": 0.0003, "max_epochs": 15}
+    # A champion whose early stopping looked inside the epoch (``train.evals_per_epoch``, a key the
+    # config has no default for) is re-run the same way, and its configuration is not the plain one.
+    fine = _fake_result("e0", "mid", cfg, 0.08, seed=5, train={"lr": 0.0003, "evals_per_epoch": 4})
+    job = propose(cfg, res + [fine], ["mid"], random.Random(0), tmp_path)
+    assert job["note"].startswith("confirm champion e0: seed 2") and job["train"] == fine["job"]["train"]
+    plain = {"tier": "mid", "train": {"lr": 0.0003}}
+    assert signature(job, cfg, seed=False) != signature(plain, cfg, seed=False)
     # Not re-run here: the teacher's checkpoints are on another machine, the shape no longer fits the
     # tier's VRAM, or the switch is off. The worker then proposes as before.
     assert propose(cfg, res, ["nano"], random.Random(0), tmp_path / "elsewhere")["note"] == "mutation of n0"
@@ -361,6 +375,7 @@ def test_a_champion_is_rerun_with_new_seeds_before_it_is_mutated(tmp_path):
     old = {**mid, "id": "old", "eval_version": cfg["eval"]["version"] - 1}
     for bad in ("junk", None, {"model": "junk"}, {"model": {"kernel": "9; rm"}}, {"model": {"device": 1}},
                 {"train": {"lr": float("nan")}}, {"train": {"batch_size": True}}, {"train": {"shell": 1}},
+                {"train": {"evals_per_epoch": "4"}},
                 {"teacher": "../../etc"}, {"teacher": ["m0"]}, {"init_from": "old", "sparsity": 0.5},
                 {"sparsity": 1.5}, {"sparsity": "0.5"}):
         champ = {**_fake_result("x", "mid", cfg, 0.9), "job": bad}

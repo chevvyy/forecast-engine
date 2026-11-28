@@ -1,8 +1,9 @@
 """Training loop shared by plain training, distillation and prune-then-finetune.
 
 Pinball loss on monotone quantiles, AdamW + cosine schedule, bf16 autocast on CUDA, early stopping on
-a purged slice of the training timeline (never on the validation block), and a wall-clock deadline so
-an unattended worker always finishes its job.
+a purged slice of the training timeline (never on the validation block), scored once per epoch or, with
+``train.evals_per_epoch``, several times inside it, and a wall-clock deadline so an unattended worker
+always finishes its job.
 """
 from __future__ import annotations
 
@@ -53,6 +54,22 @@ def apply_masks(model: torch.nn.Module, masks: dict[str, torch.Tensor] | None) -
                 p.mul_(masks[name])
 
 
+def eval_steps(steps_per_epoch: int, evals_per_epoch: object = 1) -> frozenset[int]:
+    """The steps of an epoch (1-based) after which the early-stopping slice is scored: ``evals_per_epoch``
+    evenly spaced points, the last of them the end of the epoch. 1 is the behaviour up to 2026-11-27,
+    once per epoch. On the 539-symbol universe an epoch is 370 to 1800 steps, and of the 165 version-2
+    runs without a teacher up to 2026-11-27, 75 kept the weights of their FIRST epoch in every fold and
+    125 in at least two of three: the best point may lie inside it, and nothing looked there. Anything that is not a whole number from 1 to 64 is
+    read as 1 (the value can come from a job file)."""
+    k = evals_per_epoch
+    if isinstance(k, float) and k.is_integer():
+        k = int(k)
+    if isinstance(k, bool) or not isinstance(k, int) or not 1 <= k <= 64:
+        k = 1
+    spe = max(int(steps_per_epoch), 1)
+    return frozenset(max(1, round(spe * m / k)) for m in range(1, k + 1))
+
+
 def fit(model: PatchNet, train: dict, es: dict, cfg: dict, quantiles: list[float], device: str,
         teacher_pred: np.ndarray | None = None, masks: dict[str, torch.Tensor] | None = None,
         deadline: float | None = None) -> dict:
@@ -90,14 +107,35 @@ def fit(model: PatchNet, train: dict, es: dict, cfg: dict, quantiles: list[float
             return Xt[idx]
     Pt = to(teacher_pred) if teacher_pred is not None else None
     apply_masks(model, masks)
-    best, best_state, bad, step, ep_done = float("inf"), None, 0, 0, 0
-    patience = int(cfg.get("patience", 5))
+    best, best_state, bad, step, ep_done, best_step = float("inf"), None, 0, 0, 0, 0
+    spe = (n + bs - 1) // bs                       # steps per epoch
+    marks = eval_steps(spe, cfg.get("evals_per_epoch", 1))
+    limit = int(cfg.get("patience", 5)) * len(marks)   # patience stays a number of epochs
+    qa = np.asarray(quantiles, np.float32)
+    loss = torch.zeros(())
+
+    def check() -> bool:
+        """Score the early-stopping slice, keep the weights if they are the best so far, and say
+        whether patience has run out. Draws no random numbers, so the training path does not depend on
+        how often it is called."""
+        nonlocal best, best_state, bad, best_step
+        pe = predict(model, es["X"], es["tab"], device)
+        d = es["y"][..., None] - pe
+        val = float(np.maximum(qa * d, (qa - 1) * d).mean()) if len(pe) else float(loss)
+        if val < best - 1e-5:
+            best, bad, best_step = val, 0, step
+            best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+        else:
+            bad += 1
+        return bad >= limit
+
     if on_gpu:
         torch.cuda.reset_peak_memory_stats()
+    stop = False
     for _ep in range(epochs):
         model.train()
         perm = torch.randperm(n, device=Tt.device)
-        for i in range(0, n, bs):
+        for j, i in enumerate(range(0, n, bs), start=1):
             idx = perm[i:i + bs]
             xb, tb, yb = x_at(idx).to(device), Tt[idx].to(device), Yt[idx].to(device)
             with torch.autocast("cuda", dtype=torch.bfloat16, enabled=on_gpu):
@@ -115,20 +153,19 @@ def fit(model: PatchNet, train: dict, es: dict, cfg: dict, quantiles: list[float
             apply_masks(model, masks)
             if deadline and time.time() > deadline:
                 break
+            if j in marks and j < spe:             # inside the epoch; its end is checked below
+                stop = check()
+                if stop:
+                    break
+                model.train()
         ep_done += 1
-        pe = predict(model, es["X"], es["tab"], device)
-        d = es["y"][..., None] - pe
-        qa = np.asarray(quantiles, np.float32)
-        val = float(np.maximum(qa * d, (qa - 1) * d).mean()) if len(pe) else float(loss)
-        if val < best - 1e-5:
-            best, bad = val, 0
-            best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
-        else:
-            bad += 1
-        if bad >= patience or (deadline and time.time() > deadline):
+        if stop or check() or (deadline and time.time() > deadline):
             break
     if best_state is not None:
         model.load_state_dict(best_state)
     apply_masks(model, masks)
     peak = torch.cuda.max_memory_allocated() / 2**30 if on_gpu else 0.0
-    return {"epochs": ep_done, "es_pinball": best, "peak_vram_gb": round(peak, 3)}
+    # ``epochs`` counts epochs started (the last may be partial); ``best_epoch`` says where in them the
+    # kept weights were taken, e.g. 0.25 = a quarter of the way through the first epoch.
+    return {"epochs": ep_done, "es_pinball": best, "peak_vram_gb": round(peak, 3),
+            "steps": step, "best_step": best_step, "best_epoch": round(best_step / spe, 3)}

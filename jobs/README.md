@@ -12,6 +12,8 @@ config: loop_minute             # optional track: configs/<name>.yaml instead of
 kind: train | distill | prune   # label only; behaviour comes from the fields below
 model: {d_model: 48, kernel: 15}   # overrides on top of the tier preset
 train: {lr: 0.003}                 # overrides on top of configs/loop.yaml -> train
+                                   # evals_per_epoch: 4 scores the early-stopping slice 4 times per epoch
+                                   # (default: once, at its end); patience stays a number of epochs
 teacher: <run id>               # distil from this run's fold models (needs its artifacts)
 init_from: <run id>             # start from this run's weights (prune / finetune); the job then has
                                 # the parent's model shape and lookback, whatever `model:` says

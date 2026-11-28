@@ -1,0 +1,10 @@
+tier: mid
+kind: distill
+teacher: 20261127-a8-minute2-mid-s11
+seed: 526789
+note: 'confirm champion 20261127-e5-minute2-mid-born-again-a8-s11: seed 2 of 3'
+id: 20261128-004249-pc-5070ti-c255
+origin: worker
+config: loop_minute
+worker: pc-5070ti
+attempts: 1

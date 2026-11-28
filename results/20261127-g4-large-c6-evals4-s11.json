@@ -1,0 +1,154 @@
+{
+  "config": "loop",
+  "coverage_80": [
+    [
+      0.7863,
+      0.7807
+    ],
+    [
+      0.7738,
+      0.766
+    ],
+    [
+      0.7771,
+      0.7934
+    ]
+  ],
+  "cpu_ms_per_forecast": 1.859,
+  "data_hash": "500294764fb3",
+  "device": "cuda",
+  "dm": {
+    "all": [
+      -4.977437161331102,
+      6.443168951542869e-07
+    ],
+    "ret": [
+      0.6695803064539985,
+      0.5031253716420202
+    ],
+    "vol": [
+      -9.867026835921289,
+      5.785402060383247e-23
+    ]
+  },
+  "eval_version": 2,
+  "finished": "2026-11-28T01:22:23+00:00",
+  "fits_tier": true,
+  "folds": [
+    {
+      "best_epoch": 0.499,
+      "best_step": 184,
+      "epochs": 6,
+      "es_pinball": 0.23574534058570862,
+      "n_train": 753990,
+      "n_val": 93975,
+      "peak_vram_gb": 6.232,
+      "steps": 2029
+    },
+    {
+      "best_epoch": 0.5,
+      "best_step": 205,
+      "epochs": 6,
+      "es_pinball": 0.24454550445079803,
+      "n_train": 838233,
+      "n_val": 94394,
+      "peak_vram_gb": 6.236,
+      "steps": 2255
+    },
+    {
+      "best_epoch": 0.501,
+      "best_step": 226,
+      "epochs": 6,
+      "es_pinball": 0.2481250911951065,
+      "n_train": 922663,
+      "n_val": 95360,
+      "peak_vram_gb": 6.238,
+      "steps": 2481
+    }
+  ],
+  "git": "28955d95",
+  "gpu": "NVIDIA GeForce RTX 5070 Ti",
+  "horizons": [
+    1,
+    5,
+    20
+  ],
+  "id": "20261127-g4-large-c6-evals4-s11",
+  "job": {
+    "attempts": 1,
+    "id": "20261127-g4-large-c6-evals4-s11",
+    "kind": "train",
+    "model": {
+      "d_model": 384,
+      "dropout": 0.3,
+      "ffn": 2,
+      "kernel": 15,
+      "lookback": 256,
+      "n_blocks": 4,
+      "patch": 8,
+      "stride": 4
+    },
+    "note": "the large shape without a teacher (c6: +0.0243 on this seed, +0.0200 over 4 seeds; every fold of all four kept its first epoch) with 4 early-stopping checks per epoch. Large is where a too-late first check should cost most",
+    "origin": "planner",
+    "seed": 11,
+    "tier": "large",
+    "train": {
+      "batch_size": 2048,
+      "evals_per_epoch": 4,
+      "lr": 0.0003
+    },
+    "worker": "pc-5070ti"
+  },
+  "kind": "train",
+  "minutes": 16.59,
+  "model": {
+    "d_model": 384,
+    "dropout": 0.3,
+    "ffn": 2,
+    "kernel": 15,
+    "lookback": 256,
+    "n_blocks": 4,
+    "patch": 8,
+    "stride": 4
+  },
+  "nonzero_params": 2450718,
+  "onnx_bytes": 9822780,
+  "onnx_max_abs_diff": 2.384185791015625e-07,
+  "params": 2450718,
+  "peak_vram_gb": 6.238,
+  "pinball": {
+    "ret_baseline": 0.3055918514728546,
+    "ret_model": 0.30660149455070496,
+    "vol_baseline": 0.19298601150512695,
+    "vol_har": 0.19298601150512695,
+    "vol_model": 0.181915283203125,
+    "vol_unconditional": 0.20153072476387024
+  },
+  "rank_ic_h1": 0.003981657109494603,
+  "score": 0.027030766010284424,
+  "skill_ret": -0.0033038854598999023,
+  "skill_vol": 0.05736541748046875,
+  "status": "ok",
+  "symbols": 539,
+  "tab": [
+    "log_rv5_rv20",
+    "log_rv60_rv20"
+  ],
+  "tier": "large",
+  "train": {
+    "batch_size": 2048,
+    "distill_alpha": 0.5,
+    "evals_per_epoch": 4,
+    "grad_clip": 1.0,
+    "lr": 0.0003,
+    "max_epochs": 40,
+    "patience": 5,
+    "weight_decay": 0.0001
+  },
+  "universe": {
+    "note": "current index members and megacaps: survivorship bias, return skill is optimistic",
+    "requested": 539
+  },
+  "vol_baseline": "har",
+  "worker": "pc-5070ti"
+}

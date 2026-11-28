@@ -1,0 +1,149 @@
+{
+  "config": "loop",
+  "coverage_80": [
+    [
+      0.7957,
+      0.7904
+    ],
+    [
+      0.7857,
+      0.7666
+    ],
+    [
+      0.7881,
+      0.7603
+    ]
+  ],
+  "cpu_ms_per_forecast": 0.127,
+  "data_hash": "500294764fb3",
+  "device": "cuda",
+  "dm": {
+    "all": [
+      -7.828172007906814,
+      4.950143945840692e-15
+    ],
+    "ret": [
+      -3.6614079483490483,
+      0.0002508329856649341
+    ],
+    "vol": [
+      -9.926829668803595,
+      3.182122568921249e-23
+    ]
+  },
+  "eval_version": 2,
+  "finished": "2026-11-28T01:26:51+00:00",
+  "fits_tier": true,
+  "folds": [
+    {
+      "best_epoch": 9.0,
+      "best_step": 13257,
+      "epochs": 14,
+      "es_pinball": 0.2323632687330246,
+      "n_train": 753990,
+      "n_val": 93975,
+      "peak_vram_gb": 0.628,
+      "steps": 20622
+    },
+    {
+      "best_epoch": 2.0,
+      "best_step": 3276,
+      "epochs": 7,
+      "es_pinball": 0.24138011038303375,
+      "n_train": 838233,
+      "n_val": 94394,
+      "peak_vram_gb": 0.638,
+      "steps": 11466
+    },
+    {
+      "best_epoch": 2.0,
+      "best_step": 3606,
+      "epochs": 7,
+      "es_pinball": 0.24488814175128937,
+      "n_train": 922663,
+      "n_val": 95360,
+      "peak_vram_gb": 0.651,
+      "steps": 12621
+    }
+  ],
+  "git": "259118e8",
+  "gpu": "NVIDIA GeForce RTX 5070 Ti",
+  "horizons": [
+    1,
+    5,
+    20
+  ],
+  "id": "20261127-g5-nano-distil-large-c6bc-s11",
+  "job": {
+    "attempts": 1,
+    "id": "20261127-g5-nano-distil-large-c6bc-s11",
+    "kind": "distill",
+    "model": {
+      "d_model": 32,
+      "dropout": 0.2,
+      "ffn": 2,
+      "kernel": 25,
+      "lookback": 256,
+      "n_blocks": 3,
+      "patch": 4,
+      "stride": 2
+    },
+    "note": "large into nano: the confirmed nano shape taught by the large champion (c6bc, its configuration +0.0477 over 2 seeds) instead of a mid teacher (+0.0467 from b1, +0.0468 from c1f5, 3 seeds each). Does nano follow a better teacher, as large did from b1 to e1",
+    "origin": "planner",
+    "seed": 11,
+    "teacher": "20261127-230440-pc-5070ti-c6bc",
+    "tier": "nano",
+    "worker": "pc-5070ti"
+  },
+  "kind": "distill",
+  "minutes": 4.37,
+  "model": {
+    "d_model": 32,
+    "dropout": 0.2,
+    "ffn": 2,
+    "kernel": 25,
+    "lookback": 256,
+    "n_blocks": 3,
+    "patch": 4,
+    "stride": 2
+  },
+  "nonzero_params": 19454,
+  "onnx_bytes": 94309,
+  "onnx_max_abs_diff": 2.384185791015625e-07,
+  "params": 19454,
+  "peak_vram_gb": 0.651,
+  "pinball": {
+    "ret_baseline": 0.3055918514728546,
+    "ret_model": 0.30022764205932617,
+    "vol_baseline": 0.19298601150512695,
+    "vol_har": 0.19298601150512695,
+    "vol_model": 0.1796041578054428,
+    "vol_unconditional": 0.20153072476387024
+  },
+  "rank_ic_h1": 0.016844042763973565,
+  "score": 0.043447285890579224,
+  "skill_ret": 0.017553508281707764,
+  "skill_vol": 0.06934106349945068,
+  "status": "ok",
+  "symbols": 539,
+  "tab": [
+    "log_rv5_rv20",
+    "log_rv60_rv20"
+  ],
+  "tier": "nano",
+  "train": {
+    "batch_size": 512,
+    "distill_alpha": 0.5,
+    "grad_clip": 1.0,
+    "lr": 0.001,
+    "max_epochs": 40,
+    "patience": 5,
+    "weight_decay": 0.0001
+  },
+  "universe": {
+    "note": "current index members and megacaps: survivorship bias, return skill is optimistic",
+    "requested": 539
+  },
+  "vol_baseline": "har",
+  "worker": "pc-5070ti"
+}

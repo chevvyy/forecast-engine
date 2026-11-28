@@ -1,0 +1,20 @@
+tier: nano
+kind: distill
+model:
+  d_model: 24
+  dropout: 0.1
+  ffn: 2
+  kernel: 9
+  lookback: 60
+  n_blocks: 2
+  patch: 8
+  stride: 4
+train: {}
+note: mutation of 20261127-141843-pc-5070ti-b91f
+teacher: 20261127-a8-minute2-mid-s11
+seed: 909772
+id: 20261128-015131-pc-5070ti-f1b7
+origin: worker
+config: loop_minute
+worker: pc-5070ti
+attempts: 1

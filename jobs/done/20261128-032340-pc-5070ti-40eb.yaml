@@ -1,0 +1,20 @@
+tier: nano
+kind: distill
+model:
+  d_model: 24
+  dropout: 0.3
+  ffn: 2
+  kernel: 9
+  lookback: 60
+  n_blocks: 2
+  patch: 16
+  stride: 8
+train: {}
+teacher: 20261127-a8-minute2-mid-s11
+seed: 100906
+note: 'confirm champion 20261128-032024-pc-5070ti-4c4b: seed 3 of 3'
+id: 20261128-032340-pc-5070ti-40eb
+origin: worker
+config: loop_minute
+worker: pc-5070ti
+attempts: 1

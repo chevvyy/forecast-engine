@@ -1,0 +1,14 @@
+tier: nano
+kind: prune
+init_from: 20261127-141843-pc-5070ti-b91f
+sparsity: 0.3
+train:
+  lr: 0.0003
+  max_epochs: 15
+note: prune + finetune champion
+seed: 544523
+id: 20261128-031733-pc-5070ti-c1a5
+origin: worker
+config: loop_minute
+worker: pc-5070ti
+attempts: 1

@@ -1,0 +1,22 @@
+tier: large
+kind: distill
+model:
+  d_model: 384
+  dropout: 0.3
+  ffn: 2
+  kernel: 15
+  lookback: 256
+  n_blocks: 4
+  patch: 16
+  stride: 8
+train:
+  lr: 0.0003
+  batch_size: 2048
+  weight_decay: 0.0001
+note: mutation of 20261127-230440-pc-5070ti-c6bc
+teacher: 20261127-e1-mid-born-again-k15-s11
+seed: 956850
+id: 20261128-135902-pc-5070ti-7e8e
+origin: worker
+worker: pc-5070ti
+attempts: 1

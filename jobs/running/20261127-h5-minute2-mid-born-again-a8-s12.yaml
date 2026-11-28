@@ -1,0 +1,13 @@
+id: 20261127-h5-minute2-mid-born-again-a8-s12
+tier: mid
+config: loop_minute
+kind: distill
+teacher: 20261127-a8-minute2-mid-s11
+seed: 12
+note: 'fourth seed of e5''s configuration (minute mid preset taught by a8: +0.0312,
+  +0.0267, +0.0318, mean +0.0299). The preset alone is +0.0263 over 3 and the margin
+  on minute mid is 0.006, so the teacher''s gain on minute mid is not established
+  yet'
+origin: planner
+worker: pc-5070ti
+attempts: 1

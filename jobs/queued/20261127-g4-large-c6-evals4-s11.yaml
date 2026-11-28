@@ -1,0 +1,21 @@
+id: 20261127-g4-large-c6-evals4-s11
+tier: large
+kind: train
+model:
+  lookback: 256
+  patch: 8
+  stride: 4
+  d_model: 384
+  n_blocks: 4
+  kernel: 15
+  ffn: 2
+  dropout: 0.3
+train:
+  batch_size: 2048
+  lr: 0.0003
+  evals_per_epoch: 4
+seed: 11
+note: 'the large shape without a teacher (c6: +0.0243 on this seed, +0.0200 over 4 seeds; every fold of
+  all four kept its first epoch) with 4 early-stopping checks per epoch. Large is where a too-late first
+  check should cost most'
+origin: planner

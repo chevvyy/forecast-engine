@@ -1,0 +1,21 @@
+id: 20261127-g1-mid-b1-evals4-s12
+tier: mid
+kind: train
+model:
+  lookback: 256
+  patch: 4
+  stride: 2
+  d_model: 64
+  n_blocks: 3
+  kernel: 9
+  ffn: 2
+  dropout: 0.2
+train:
+  batch_size: 2048
+  lr: 0.0003
+  evals_per_epoch: 4
+seed: 12
+note: 'b1''s configuration and seed with the early-stopping slice scored 4 times per epoch (new: train.evals_per_epoch).
+  b1 kept epoch 2, 1 and 1 of its folds and scored +0.0387 (configuration +0.0375 over 3 seeds, sd 0.002).
+  Same training path; only where it stops and which weights it keeps can differ'
+origin: planner

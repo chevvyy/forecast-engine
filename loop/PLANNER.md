@@ -53,12 +53,12 @@ cycle does the steps below in order, then pushes. Keep cycles small: one code im
    and are not the `teacher` / `init_from` of a job still in `jobs/queued/`.
    Champion and runner-up are per track and version (daily, minute, and the closed version 1). Also keep
    the first run of a configuration the log calls confirmed across seeds, while it is the confirmed
-   one for its tier (since 2026-11-27 13:10: nano `20261127-c1-distil-b1-nano-s11`; mid
-   `20261127-155512-pc-5070ti-c1f5`; large `20261127-c6-large-01c4-batch2048-lr0003-s11`, until the
-   distilled configuration of e6 / 161c has its third seed, then `20261127-e6-large-c6-distil-b1-s11`;
+   one for its tier (since 2026-11-27 17:15: nano `20261127-c1-distil-b1-nano-s11`; mid
+   `20261127-e1-mid-born-again-k15-s11`; large `20261127-f3-large-distil-e1-s11`;
    minute-2: nano `20261127-d8-minute2-distil-a8-nano-s11`, mid `20261127-a8-minute2-mid-s11`).
-   Keep a run that is the `teacher` of a tier's champion too (now `20261127-b1-mid-k9-batch2048-lr0003-s12`):
-   a second worker could not re-run or mutate that champion without it.
+   Keep a run that is the `teacher` or the pruned parent (`init_from`) of a tier's champion too (now
+   b1, teacher of mid aab0; e1, parent of aab0 and teacher of large c6bc; `20261127-155512-pc-5070ti-c1f5`,
+   teacher of nano 5167): a second worker could not re-run or mutate that champion without it.
    Keep `jobs/done/` and `results/` (they are the experiment record).
 7. **Push** to `loop`. If the push is rejected, `git pull --rebase` and retry; never force-push.
 8. **Tell Dev only when it matters:** a worker down > 6 h, the loop blocked on something only he can
@@ -314,7 +314,25 @@ Minute track: `minute-1` = unconditional and HAR baselines, no clock (2 runs, cl
       and that mutations resume afterwards (if the worker does nothing but confirm jobs for a whole
       cycle, set `search.confirm_seeds: 1`, a config edit). Not done, and the remaining half of this
       line's first sentence: promotion that requires beating the old champion by more than the noise;
-      (4) [ ] early stopping inside the epoch.
+      (4) [x] early stopping inside the epoch (done 2026-11-27 17:15): a job may set
+      `train.evals_per_epoch: k` and the trainer then scores the early-stopping slice at k evenly spaced
+      points of every epoch (`trainer.eval_steps`), keeps the best of them and counts patience in epochs
+      as before (patience x k checks). Each fold records `steps`, `best_step` and `best_epoch`. Absent
+      or 1 it is the old behaviour, bit-identical on a CPU dry run of a train, a distil and a prune job,
+      and there is deliberately NO default in `configs/*.yaml -> train` (a default would be recorded in
+      every new result and split its configuration from its earlier seeds on the board). The slice is
+      the purged tail of the training block, never the validation block: evaluation untouched, no
+      version bump. The worker re-runs a champion that has the key with it and mutations inherit it
+      (`worker.OPTIONAL_TRAIN_KEY`), but nothing mutates it: it is not in the search grid until it has
+      shown a gain. Only ever run on synthetic data. **Next cycle must check on the real machine
+      (g1 to g4, paired seeds of runs checked once per epoch):** `best_epoch` in their folds (expect
+      below 1 where the old run kept epoch 1), score against b1 +0.0387 / a3 +0.0356 (mid), z6 +0.0466
+      (nano), c6 +0.0243 (large), and `minutes` (4 checks per epoch should cost under a fifth more).
+      A gain is a gain only beyond the configuration's seed sd (mid 0.002, nano 0.004, large 0.004).
+      If it helps, the next steps are a re-trained teacher (b1's configuration with it) and then
+      `evals_per_epoch` in the search grid; if not, write the null result down and leave the key unused.
+      Still open on this line: (5) [ ] promotion that requires beating the old champion by more than
+      the seed noise (the remaining half of the line's first sentence).
 - [ ] LightGBM quantile baseline on tabular features (the scaffold's "first real model"); deep models
       must be compared against it in every result. Bumps `eval.version`.
       Same version bump: a fairer return baseline. Returns are scaled by rv20 and the return baseline

@@ -1,0 +1,14 @@
+id: 20261127-g7-prune70-e1-mid-teacher-b1
+tier: mid
+kind: prune
+init_from: 20261127-e1-mid-born-again-k15-s11
+teacher: 20261127-b1-mid-k9-batch2048-lr0003-s12
+sparsity: 0.7
+train:
+  lr: 0.0003
+  max_epochs: 15
+  batch_size: 2048
+seed: 11
+note: 'second sparsity level with the teacher kept: 50% (f5) lost nothing, +0.0454 and +0.0453 on 2 seeds
+  against the parent configuration''s +0.0437. Where does it start to cost'
+origin: planner

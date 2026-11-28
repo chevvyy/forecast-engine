@@ -1,0 +1,20 @@
+id: 20261127-g6-mid-distil-large-c6bc-s11
+tier: mid
+kind: distill
+teacher: 20261127-230440-pc-5070ti-c6bc
+model:
+  lookback: 256
+  patch: 4
+  stride: 2
+  d_model: 64
+  n_blocks: 3
+  kernel: 15
+  ffn: 2
+  dropout: 0.2
+train:
+  batch_size: 2048
+  lr: 0.0003
+seed: 11
+note: 'large into mid: e1''s shape taught by the large champion c6bc (e1''s configuration, taught by b1,
+  +0.0437 over 3 seeds; taught by e1 itself +0.0437 on this seed)'
+origin: planner

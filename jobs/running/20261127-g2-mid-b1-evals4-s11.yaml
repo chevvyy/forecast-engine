@@ -15,5 +15,8 @@ train:
   lr: 0.0003
   evals_per_epoch: 4
 seed: 11
-note: second paired seed of g1 (a3, the same configuration at seed 11 checked once per epoch, scored +0.0356)
+note: second paired seed of g1 (a3, the same configuration at seed 11 checked once
+  per epoch, scored +0.0356)
 origin: planner
+worker: pc-5070ti
+attempts: 1

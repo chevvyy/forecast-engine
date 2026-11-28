@@ -14,6 +14,8 @@ train:
   lr: 0.0003
   evals_per_epoch: 4
 seed: 13
-note: the best nano configuration without a teacher (+0.0431 over 3 seeds, z6 +0.0466 on this seed; folds
-  kept epoch 3, 1, 1) with 4 early-stopping checks per epoch
+note: the best nano configuration without a teacher (+0.0431 over 3 seeds, z6 +0.0466
+  on this seed; folds kept epoch 3, 1, 1) with 4 early-stopping checks per epoch
 origin: planner
+worker: pc-5070ti
+attempts: 1
